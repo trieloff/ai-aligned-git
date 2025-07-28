@@ -201,6 +201,15 @@ install_script() {
     
     print_color $BLUE "Installing AI-Aligned-Git..."
     
+    # Check if git wrapper already exists
+    if [ -f "$dest_path" ]; then
+        print_color $YELLOW "⚠ Git wrapper already exists at $dest_path"
+        if ! prompt_yes_no "Do you want to overwrite it? [y/N] " "n"; then
+            print_color $YELLOW "Installation cancelled"
+            return 1
+        fi
+    fi
+    
     # Check if we're running from a local checkout or via curl
     if [ -t 0 ] && [ -f "$(dirname "${BASH_SOURCE[0]}")/$SOURCE_SCRIPT" ]; then
         # Local installation
@@ -227,15 +236,6 @@ install_script() {
         
         # Move to destination
         mv "$temp_file" "$dest_path"
-    fi
-    
-    # Check if git wrapper already exists
-    if [ -f "$dest_path" ]; then
-        print_color $YELLOW "⚠ Git wrapper already exists at $dest_path"
-        if ! prompt_yes_no "Do you want to overwrite it? [y/N] " "n"; then
-            print_color $YELLOW "Installation cancelled"
-            return 1
-        fi
     fi
     
     if [ $? -ne 0 ]; then
@@ -365,6 +365,17 @@ verify_installation() {
 main() {
     print_color $BLUE "=== AI-Aligned-Git Installer ==="
     echo
+    print_color $YELLOW "This installer will:"
+    print_color $YELLOW "  • Install the git wrapper to ~/.local/bin/git"
+    print_color $YELLOW "  • Ensure ~/.local/bin is in your PATH"
+    print_color $YELLOW "  • Verify the wrapper will intercept git commands"
+    echo
+    
+    if ! prompt_yes_no "Do you want to continue? [Y/n] " "y"; then
+        print_color $YELLOW "Installation cancelled."
+        exit 0
+    fi
+    echo
     
     # Check prerequisites
     if ! check_git_installed; then
@@ -405,6 +416,14 @@ main() {
                 exit 1
             fi
         fi
+    fi
+    
+    # Final confirmation before installing
+    echo
+    print_color $BLUE "Ready to install AI-Aligned-Git"
+    if ! prompt_yes_no "Proceed with installation? [Y/n] " "y"; then
+        print_color $YELLOW "Installation cancelled."
+        exit 0
     fi
     
     # Install the script
