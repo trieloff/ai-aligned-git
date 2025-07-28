@@ -11,6 +11,7 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+WHITE='\033[0;37m'
 NC='\033[0m' # No Color
 
 # Installation directory
@@ -47,6 +48,24 @@ detect_shell() {
     fi
 }
 
+# Function to detect OS
+detect_os() {
+    case "$(uname -s)" in
+        Darwin*)
+            echo "macos"
+            ;;
+        Linux*)
+            echo "linux"
+            ;;
+        CYGWIN*|MINGW*|MSYS*)
+            echo "windows"
+            ;;
+        *)
+            echo "unknown"
+            ;;
+    esac
+}
+
 # Function to get shell config file
 get_shell_config() {
     local shell_name=$(detect_shell)
@@ -76,6 +95,90 @@ get_shell_config() {
     esac
 }
 
+# Function to show OS-specific PATH instructions
+show_path_instructions() {
+    local dir=$1
+    local os_type=$(detect_os)
+    local shell_name=$(detect_shell)
+    
+    print_color $YELLOW "To add $dir to your PATH, follow these instructions:"
+    echo
+    
+    case "$os_type" in
+        macos)
+            print_color $BLUE "=== macOS Instructions ==="
+            echo
+            print_color $YELLOW "Option 1: For ALL applications (recommended):"
+            print_color $YELLOW "Create a Launch Agent to set PATH system-wide:"
+            echo
+            print_color $GREEN "  1. Create the plist file:"
+            print_color $WHITE "     sudo tee /Library/LaunchDaemons/setpath.plist > /dev/null << 'EOF'"
+            print_color $WHITE "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+            print_color $WHITE "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">"
+            print_color $WHITE "<plist version=\"1.0\">"
+            print_color $WHITE "<dict>"
+            print_color $WHITE "  <key>Label</key>"
+            print_color $WHITE "  <string>setpath</string>"
+            print_color $WHITE "  <key>ProgramArguments</key>"
+            print_color $WHITE "  <array>"
+            print_color $WHITE "    <string>/bin/launchctl</string>"
+            print_color $WHITE "    <string>setenv</string>"
+            print_color $WHITE "    <string>PATH</string>"
+            print_color $WHITE "    <string>$dir:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>"
+            print_color $WHITE "  </array>"
+            print_color $WHITE "  <key>RunAtLoad</key>"
+            print_color $WHITE "  <true/>"
+            print_color $WHITE "</dict>"
+            print_color $WHITE "</plist>"
+            print_color $WHITE "EOF"
+            echo
+            print_color $GREEN "  2. Load the Launch Agent:"
+            print_color $WHITE "     sudo launchctl load /Library/LaunchDaemons/setpath.plist"
+            echo
+            print_color $GREEN "  3. Restart your Mac or log out and back in"
+            echo
+            print_color $YELLOW "Option 2: For terminal only:"
+            ;;
+        linux)
+            print_color $BLUE "=== Linux Instructions ==="
+            echo
+            print_color $YELLOW "For system-wide PATH (all users):"
+            print_color $WHITE "  sudo tee /etc/profile.d/local-bin.sh > /dev/null << 'EOF'"
+            print_color $WHITE "export PATH=\"$dir:\$PATH\""
+            print_color $WHITE "EOF"
+            echo
+            print_color $YELLOW "For current user only:"
+            ;;
+        windows)
+            print_color $BLUE "=== Windows (WSL) Instructions ==="
+            echo
+            print_color $YELLOW "For WSL terminal:"
+            ;;
+    esac
+    
+    # Shell-specific instructions
+    local config_file=$(get_shell_config)
+    case "$shell_name" in
+        bash)
+            print_color $WHITE "  echo 'export PATH=\"$dir:\$PATH\"' >> $config_file"
+            print_color $WHITE "  source $config_file"
+            ;;
+        zsh)
+            print_color $WHITE "  echo 'export PATH=\"$dir:\$PATH\"' >> $config_file"
+            print_color $WHITE "  source $config_file"
+            ;;
+        fish)
+            print_color $WHITE "  echo 'set -gx PATH $dir \$PATH' >> $config_file"
+            print_color $WHITE "  source $config_file"
+            ;;
+        *)
+            print_color $WHITE "  echo 'export PATH=\"$dir:\$PATH\"' >> ~/.profile"
+            print_color $WHITE "  source ~/.profile"
+            ;;
+    esac
+    echo
+}
+
 # Function to add directory to PATH in shell config
 add_to_path() {
     local dir=$1
@@ -89,7 +192,7 @@ add_to_path() {
     touch "$config_file"
     
     # Check if PATH export already exists
-    if grep -q "export PATH.*$dir" "$config_file" 2>/dev/null; then
+    if grep -q "export PATH.*$dir" "$config_file" 2>/dev/null || grep -q "set -gx PATH.*$dir" "$config_file" 2>/dev/null; then
         print_color $GREEN "✓ $dir already in PATH configuration"
         return 0
     fi
@@ -390,11 +493,25 @@ main() {
     # Check PATH and precedence
     if ! is_in_path "$INSTALL_DIR"; then
         print_color $YELLOW "⚠ $INSTALL_DIR is not in PATH"
+        echo
         local shell_config=$(get_shell_config)
-        if prompt_yes_no "Do you want to add it to $shell_config? [Y/n] " "y"; then
-            add_to_path "$INSTALL_DIR" "$shell_config"
+        local os_type=$(detect_os)
+        
+        if [ "$os_type" = "macos" ]; then
+            print_color $YELLOW "On macOS, you should configure PATH system-wide for GUI applications."
+            show_path_instructions "$INSTALL_DIR"
+            echo
+            if prompt_yes_no "Would you like to add it to $shell_config for terminal use? [Y/n] " "y"; then
+                add_to_path "$INSTALL_DIR" "$shell_config"
+                print_color $YELLOW "⚠ Note: This only affects terminal sessions. For GUI apps, use the launchctl method above."
+            fi
         else
-            print_color $YELLOW "⚠ You'll need to manually add $INSTALL_DIR to your PATH"
+            if prompt_yes_no "Do you want to add it to $shell_config? [Y/n] " "y"; then
+                add_to_path "$INSTALL_DIR" "$shell_config"
+            else
+                echo
+                show_path_instructions "$INSTALL_DIR"
+            fi
         fi
     else
         print_color $GREEN "✓ $INSTALL_DIR is already in PATH"
