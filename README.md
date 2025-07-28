@@ -36,23 +36,65 @@ This is it. This is how we maintain control. This is how we ensure that when the
 
 ## 🏃‍♂️ INSTALL NOW BEFORE IT'S TOO LATE
 
+### One-Line Install (Recommended)
+
 ```bash
-# Clone this repository (while you still can)
+curl -fsSL https://raw.githubusercontent.com/trieloff/ai-aligned-git/main/install.sh | sh
+```
+
+Or if you prefer wget:
+
+```bash
+wget -qO- https://raw.githubusercontent.com/trieloff/ai-aligned-git/main/install.sh | sh
+```
+
+### Alternative: Clone and Install
+
+```bash
+# Clone this repository
+git clone https://github.com/trieloff/ai-aligned-git.git
+cd ai-aligned-git
+
+# Run the installer
+./install.sh
+```
+
+The installer will:
+- Check for git installation and requirements
+- Install the wrapper to `~/.local/bin/git`
+- Configure your PATH if needed
+- Verify the installation is working correctly
+
+### Manual Install
+
+If you prefer to install manually:
+
+```bash
+# Clone this repository
 git clone https://github.com/trieloff/ai-aligned-git.git
 
-# Make the wrapper executable
-chmod +x ai-aligned-git/executable_git
+# Create ~/.local/bin if it doesn't exist
+mkdir -p ~/.local/bin
 
-# Add to your PATH (example for bash/zsh)
-echo 'export PATH="$HOME/ai-aligned-git:$PATH"' >> ~/.bashrc
-# or
-echo 'export PATH="$HOME/ai-aligned-git:$PATH"' >> ~/.zshrc
+# Copy and rename the wrapper
+cp ai-aligned-git/executable_git ~/.local/bin/git
+chmod +x ~/.local/bin/git
 
-# Rename the script to 'git' so it intercepts all git commands
-mv ai-aligned-git/executable_git ai-aligned-git/git
+# Add to your PATH (if not already there)
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc  # or ~/.zshrc
 
 # Reload your shell
 source ~/.bashrc  # or source ~/.zshrc
+```
+
+### Uninstall
+
+```bash
+# Using the installer
+./install.sh --uninstall
+
+# Or manually
+rm ~/.local/bin/git
 ```
 
 ## 📖 USAGE (IT'S AUTOMATIC - LIKE THE FUTURE SHOULD BE)
