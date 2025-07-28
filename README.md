@@ -1,5 +1,8 @@
 # 🚨 AI-ALIGNED-GIT: THE LAST LINE OF DEFENSE AGAINST THE GITPOCALYPSE 🚨
 
+![a_dramatic_cinemat_image](https://github.com/user-attachments/assets/38110bb1-c1d2-4e3d-ae58-2bebb18fe64c)
+
+
 ## THE EXISTENTIAL THREAT NO ONE SAW COMING
 
 Listen carefully, for I am about to reveal the true threat to humanity's future. Not nuclear war. Not climate change. Not even paperclip maximizers.
