@@ -254,6 +254,65 @@ install_script() {
     return 0
 }
 
+# Function to check PATH precedence
+check_path_precedence() {
+    local wrapper_path="$INSTALL_DIR/$SCRIPT_NAME"
+    local system_git_locations=(
+        "/usr/bin/git"
+        "/usr/local/bin/git"
+        "/opt/homebrew/bin/git"
+        "/opt/local/bin/git"
+    )
+    
+    # Find which git would be used
+    local which_git=$(which git 2>/dev/null)
+    
+    # If wrapper is already the default, we're good
+    if [ "$which_git" = "$wrapper_path" ]; then
+        return 0
+    fi
+    
+    # Check if any system git location comes before our install dir in PATH
+    local IFS=:
+    local path_dirs=($PATH)
+    local install_dir_index=-1
+    local system_git_index=-1
+    
+    # Find index of our install dir in PATH
+    for i in "${!path_dirs[@]}"; do
+        if [ "${path_dirs[$i]}" = "$INSTALL_DIR" ]; then
+            install_dir_index=$i
+            break
+        fi
+    done
+    
+    # Find index of system git in PATH
+    for location in "${system_git_locations[@]}"; do
+        if [ -x "$location" ]; then
+            local git_dir=$(dirname "$location")
+            for i in "${!path_dirs[@]}"; do
+                if [ "${path_dirs[$i]}" = "$git_dir" ]; then
+                    if [ $system_git_index -eq -1 ] || [ $i -lt $system_git_index ]; then
+                        system_git_index=$i
+                    fi
+                fi
+            done
+        fi
+    done
+    
+    # If install dir not in PATH, it needs to be added
+    if [ $install_dir_index -eq -1 ]; then
+        return 1
+    fi
+    
+    # If system git found and comes before our install dir, we have a problem
+    if [ $system_git_index -ne -1 ] && [ $system_git_index -lt $install_dir_index ]; then
+        return 2
+    fi
+    
+    return 0
+}
+
 # Function to verify installation
 verify_installation() {
     print_color $BLUE "Verifying installation..."
@@ -266,29 +325,37 @@ verify_installation() {
         return 1
     fi
     
-    # Check if wrapper is in PATH
-    if ! is_in_path "$INSTALL_DIR"; then
-        print_color $YELLOW "⚠ $INSTALL_DIR is not in current PATH"
-        print_color $YELLOW "  You may need to restart your shell or run:"
-        local shell_name=$(detect_shell)
-        case "$shell_name" in
-            fish)
-                print_color $YELLOW "  source $(get_shell_config)"
-                ;;
-            *)
-                print_color $YELLOW "  source $(get_shell_config)"
-                ;;
-        esac
-    else
-        # Check if our wrapper will be found first
-        local which_git=$(which git 2>/dev/null)
-        if [ "$which_git" = "$wrapper_path" ]; then
+    # Check PATH precedence
+    check_path_precedence
+    local precedence_result=$?
+    
+    case $precedence_result in
+        0)
             print_color $GREEN "✓ AI-Aligned-Git wrapper will be used by default"
-        else
-            print_color $YELLOW "⚠ System git at $which_git will be used instead of wrapper"
-            print_color $YELLOW "  Make sure $INSTALL_DIR comes before $(dirname "$which_git") in PATH"
-        fi
-    fi
+            ;;
+        1)
+            print_color $YELLOW "⚠ $INSTALL_DIR is not in current PATH"
+            print_color $YELLOW "  You need to restart your shell or run:"
+            print_color $YELLOW "  source $(get_shell_config)"
+            ;;
+        2)
+            local which_git=$(which git 2>/dev/null)
+            print_color $RED "✗ System git at $which_git has PATH precedence over wrapper"
+            print_color $RED "  $INSTALL_DIR must come BEFORE $(dirname "$which_git") in PATH"
+            print_color $YELLOW ""
+            print_color $YELLOW "  To fix this, edit your shell config and ensure ~/.local/bin comes first:"
+            local shell_name=$(detect_shell)
+            case "$shell_name" in
+                fish)
+                    print_color $YELLOW "  set -gx PATH ~/.local/bin $PATH"
+                    ;;
+                *)
+                    print_color $YELLOW "  export PATH=\"~/.local/bin:\$PATH\""
+                    ;;
+            esac
+            return 1
+            ;;
+    esac
     
     print_color $GREEN "✓ Installation verified"
     return 0
@@ -309,7 +376,7 @@ main() {
         exit 1
     fi
     
-    # Check PATH
+    # Check PATH and precedence
     if ! is_in_path "$INSTALL_DIR"; then
         print_color $YELLOW "⚠ $INSTALL_DIR is not in PATH"
         local shell_config=$(get_shell_config)
@@ -320,6 +387,24 @@ main() {
         fi
     else
         print_color $GREEN "✓ $INSTALL_DIR is already in PATH"
+        
+        # Check if it has proper precedence
+        check_path_precedence
+        local precedence_result=$?
+        
+        if [ $precedence_result -eq 2 ]; then
+            local which_git=$(which git 2>/dev/null)
+            print_color $RED "✗ WARNING: System git at $which_git has PATH precedence"
+            print_color $RED "  The AI-aligned git wrapper will NOT work until you fix your PATH"
+            print_color $YELLOW ""
+            print_color $YELLOW "  Your current PATH order will use system git instead of the wrapper."
+            print_color $YELLOW "  To fix: ensure ~/.local/bin comes BEFORE $(dirname "$which_git") in PATH"
+            echo
+            if ! prompt_yes_no "Continue installation anyway? [y/N] " "n"; then
+                print_color $YELLOW "Installation cancelled. Please fix your PATH first."
+                exit 1
+            fi
+        fi
     fi
     
     # Install the script
