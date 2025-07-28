@@ -80,7 +80,8 @@ find_real_git() {
     done
 
     # If not found in common locations, search PATH excluding our own directory
-    local our_dir=$(dirname "$0")
+    local our_dir
+    our_dir=$(dirname "$0")
     local IFS=:
     for dir in $PATH; do
         if [ "$dir" != "$our_dir" ] && [ -x "$dir/git" ]; then
@@ -98,8 +99,10 @@ GIT_BIN=$(find_real_git)
 
 # Function to get configured git user for signoff
 get_git_signoff() {
-    local git_name=$("$GIT_BIN" config user.name 2>/dev/null)
-    local git_email=$("$GIT_BIN" config user.email 2>/dev/null)
+    local git_name
+    local git_email
+    git_name=$("$GIT_BIN" config user.name 2>/dev/null)
+    git_email=$("$GIT_BIN" config user.email 2>/dev/null)
 
     if [ -n "$git_name" ] && [ -n "$git_email" ]; then
         echo "Signed-off-by: $git_name <$git_email>"
