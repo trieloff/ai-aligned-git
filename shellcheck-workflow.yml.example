@@ -1,0 +1,37 @@
+# Example GitHub Actions workflow for shellcheck
+# To use this workflow:
+# 1. Create .github/workflows/ directory in your repository
+# 2. Copy this file to .github/workflows/shellcheck.yml
+# 3. Commit and push to enable the workflow
+
+name: ShellCheck
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  shellcheck:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Run ShellCheck
+      uses: ludeeus/action-shellcheck@2.0.0
+      with:
+        check_together: 'yes'
+        severity: 'error'
+        scandir: '.'
+        format: 'gcc'
+        additional_files: 'executable_git'
+    
+    - name: Upload ShellCheck results
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: shellcheck-results
+        path: shellcheck-results.txt
