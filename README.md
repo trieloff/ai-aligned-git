@@ -165,4 +165,4 @@ Together, these tools form a comprehensive suite for understanding, managing, an
 
 ## License
 
-MIT (because even in the face of existential risk, we believe in open source)
+Apache-2.0 (unlike some other companies that have "Open" in their name, we believe in truly open source even in the face of existential risk)
