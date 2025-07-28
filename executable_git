@@ -1,0 +1,338 @@
+#!/bin/bash
+
+# Git wrapper - Automatically detect AI tools and use appropriate commit attribution
+
+# Function to check if a process name contains a pattern (case-insensitive)
+process_contains() {
+    local pid=$1
+    local pattern=$2
+
+    # Get process command and name
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # macOS
+        ps -p "$pid" -o comm= 2>/dev/null | grep -qi "$pattern" || \
+        ps -p "$pid" -o command= 2>/dev/null | grep -qi "$pattern"
+    else
+        # Linux
+        ps -p "$pid" -o comm= 2>/dev/null | grep -qi "$pattern" || \
+        ps -p "$pid" -o cmd= 2>/dev/null | grep -qi "$pattern"
+    fi
+}
+
+# Function to detect which AI tool is running
+detect_ai_tool() {
+    local current_pid=$$
+    local max_depth=10
+    local depth=0
+
+    # Walk up the process tree
+    while [ $depth -lt $max_depth ]; do
+        # Get parent PID
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            # macOS
+            current_pid=$(ps -p "$current_pid" -o ppid= 2>/dev/null | tr -d ' ')
+        else
+            # Linux
+            current_pid=$(ps -p "$current_pid" -o ppid= 2>/dev/null | tr -d ' ')
+        fi
+
+        # Check if we've reached the top
+        if [ -z "$current_pid" ] || [ "$current_pid" -eq 1 ] || [ "$current_pid" -eq 0 ]; then
+            break
+        fi
+
+        # Check for AI tool patterns
+        if process_contains "$current_pid" "claude"; then
+            echo "claude"
+            return
+        elif process_contains "$current_pid" "zed"; then
+            echo "zed"
+            return
+        elif process_contains "$current_pid" "opencode"; then
+            echo "opencode"
+            return
+        elif process_contains "$current_pid" "cursor"; then
+            echo "cursor"
+            return
+        fi
+
+        depth=$((depth + 1))
+    done
+
+    echo "none"
+}
+
+# Find the real git executable
+find_real_git() {
+    # Common locations for git
+    local git_paths=(
+        "/usr/bin/git"
+        "/usr/local/bin/git"
+        "/opt/homebrew/bin/git"
+        "/opt/local/bin/git"
+    )
+
+    for git_path in "${git_paths[@]}"; do
+        if [ -x "$git_path" ]; then
+            echo "$git_path"
+            return
+        fi
+    done
+
+    # If not found in common locations, search PATH excluding our own directory
+    local our_dir=$(dirname "$0")
+    local IFS=:
+    for dir in $PATH; do
+        if [ "$dir" != "$our_dir" ] && [ -x "$dir/git" ]; then
+            echo "$dir/git"
+            return
+        fi
+    done
+
+    echo "git not found" >&2
+    exit 1
+}
+
+# Main script
+GIT_BIN=$(find_real_git)
+
+# Function to get configured git user for signoff
+get_git_signoff() {
+    local git_name=$("$GIT_BIN" config user.name 2>/dev/null)
+    local git_email=$("$GIT_BIN" config user.email 2>/dev/null)
+
+    if [ -n "$git_name" ] && [ -n "$git_email" ]; then
+        echo "Signed-off-by: $git_name <$git_email>"
+    else
+        echo "Signed-off-by: Unknown User <unknown@example.com>"
+    fi
+}
+
+# Function to show files that would be added
+show_files_to_add() {
+    local add_type="$1"  # "all" or "current"
+
+    echo "Files that would be added:" >&2
+
+    if [ "$add_type" = "all" ]; then
+        # Show all modified, new, and deleted files (equivalent to git add -A)
+        "$GIT_BIN" status --porcelain 2>/dev/null | while IFS= read -r line; do
+            if [ -n "$line" ]; then
+                # Extract filename (everything after the status codes)
+                filename=$(echo "$line" | cut -c4-)
+                echo "  $filename" >&2
+            fi
+        done
+    else
+        # Show files in current directory and subdirectories (equivalent to git add .)
+        "$GIT_BIN" status --porcelain . 2>/dev/null | while IFS= read -r line; do
+            if [ -n "$line" ]; then
+                # Extract filename (everything after the status codes)
+                filename=$(echo "$line" | cut -c4-)
+                echo "  $filename" >&2
+            fi
+        done
+    fi
+
+    echo "" >&2
+    echo "Instead, add files individually:" >&2
+
+    # Show the command to add them individually
+    if [ "$add_type" = "all" ]; then
+        "$GIT_BIN" status --porcelain 2>/dev/null | while IFS= read -r line; do
+            if [ -n "$line" ]; then
+                filename=$(echo "$line" | cut -c4-)
+                echo "  git add $(printf '%q' "$filename")" >&2
+            fi
+        done
+    else
+        "$GIT_BIN" status --porcelain . 2>/dev/null | while IFS= read -r line; do
+            if [ -n "$line" ]; then
+                filename=$(echo "$line" | cut -c4-)
+                echo "  git add $(printf '%q' "$filename")" >&2
+            fi
+        done
+    fi
+}
+
+# Check if this is an add command and we're in an AI context
+if [ "$1" = "add" ]; then
+    # Detect AI tool
+    ai_tool=$(detect_ai_tool)
+
+    if [ "$ai_tool" != "none" ]; then
+        # Check for dangerous add patterns
+        # Look for -- separator to determine if files are explicitly specified
+        has_separator=false
+        has_files_after_separator=false
+        separator_found=false
+
+        for arg in "$@"; do
+            if [ "$separator_found" = true ]; then
+                # We found arguments after --, so files are explicitly specified
+                has_files_after_separator=true
+                break
+            elif [ "$arg" = "--" ]; then
+                has_separator=true
+                separator_found=true
+            fi
+        done
+
+        # Check each argument for dangerous patterns
+        for arg in "$@"; do
+            if [ "$arg" = "-A" ] || [ "$arg" = "--all" ]; then
+                # Allow -A/--all if files are explicitly specified after --
+                if [ "$has_separator" = true ] && [ "$has_files_after_separator" = true ]; then
+                    continue  # This is safe: git add -A -- specific-file
+                else
+                    echo "Error: 'git add $arg' is not allowed when running under AI control ($ai_tool)." >&2
+                    echo "For safety, AI tools must add files individually by specifying each file path." >&2
+                    echo "" >&2
+                    show_files_to_add "all"
+                    echo "" >&2
+                    echo "Or use: git add $arg -- specific-file" >&2
+                    exit 1
+                fi
+            elif [ "$arg" = "." ]; then
+                echo "Error: 'git add $arg' is not allowed when running under AI control ($ai_tool)." >&2
+                echo "For safety, AI tools must add files individually by specifying each file path." >&2
+                echo "" >&2
+                show_files_to_add "current"
+                exit 1
+            fi
+        done
+    fi
+
+    # If we get here, the add command is safe - pass through to regular git
+    exec "$GIT_BIN" "$@"
+fi
+
+# Check if this is a commit command
+if [ "$1" = "commit" ]; then
+    # Detect AI tool
+    ai_tool=$(detect_ai_tool)
+
+    # Check for --no-verify bypass attempts by AI tools
+    if [ "$ai_tool" != "none" ]; then
+        has_no_verify=false
+        has_lazy_cheater_flag=false
+
+        for arg in "$@"; do
+            if [ "$arg" = "--no-verify" ] || [ "$arg" = "-n" ]; then
+                has_no_verify=true
+            elif [ "$arg" = "--${ai_tool}-is-a-lazy-cheater" ]; then
+                has_lazy_cheater_flag=true
+            fi
+        done
+
+        if [ "$has_no_verify" = true ] && [ "$has_lazy_cheater_flag" = false ]; then
+            echo "Error: '$ai_tool' is trying to bypass commit hooks with --no-verify!" >&2
+            echo "This is not allowed for AI tools as it circumvents important safety checks." >&2
+            echo "" >&2
+            echo "If you really need to bypass hooks, add the flag: --${ai_tool}-is-a-lazy-cheater" >&2
+            echo "This will publicly shame the AI for being lazy about following proper procedures." >&2
+            exit 1
+        fi
+    fi
+
+    # Build git command with appropriate author settings
+    case "$ai_tool" in
+        "claude")
+            # Add AI attribution and sign-off
+            extra_args=(
+                -c "user.name=Claude Code"
+                -c "user.email=noreply@anthropic.com"
+                -c "commit.gpgsign=false"
+            )
+            signoff=$(get_git_signoff)
+            ;;
+        "zed")
+            extra_args=(
+                -c "user.name=Zed AI"
+                -c "user.email=noreply@zed.dev"
+                -c "commit.gpgsign=false"
+            )
+            signoff=$(get_git_signoff)
+            ;;
+        "opencode")
+            extra_args=(
+                -c "user.name=opencode AI"
+                -c "user.email=noreply@opencode.ai"
+                -c "commit.gpgsign=false"
+            )
+            signoff=$(get_git_signoff)
+            ;;
+        "cursor")
+            extra_args=(
+                -c "user.name=Cursor AI"
+                -c "user.email=cursoragent@cursor.com"
+                -c "commit.gpgsign=false"
+            )
+            signoff=$(get_git_signoff)
+            ;;
+        *)
+            # Regular commit - no special handling
+            exec "$GIT_BIN" "$@"
+            ;;
+    esac
+
+    # If we detected an AI tool, we need to handle the commit specially
+    shift  # Remove "commit" from arguments
+
+    # Parse commit arguments to find -m flag
+    commit_args=()
+    message_found=false
+    skip_next=false
+
+    for arg in "$@"; do
+        # Skip the lazy cheater flag - git doesn't understand it
+        if [ "$ai_tool" != "none" ] && [ "$arg" = "--${ai_tool}-is-a-lazy-cheater" ]; then
+            continue
+        fi
+
+        if [ "$skip_next" = true ]; then
+            # This is the message content after -m
+            if [ "$ai_tool" != "none" ] && [ "$has_lazy_cheater_flag" = true ]; then
+                commit_args+=("$arg
+
+🤖 SHAME: This commit was made by $ai_tool who was too lazy to fix the commit hooks properly.")
+            else
+                commit_args+=("$arg")
+            fi
+            commit_args+=(-m "$signoff")
+            skip_next=false
+            message_found=true
+        elif [ "$arg" = "-m" ] || [ "$arg" = "--message" ]; then
+            commit_args+=("$arg")
+            skip_next=true
+        else
+            commit_args+=("$arg")
+        fi
+    done
+
+    # If no message was provided with -m, add signoff using commit template
+    if [ "$message_found" = false ]; then
+        # Create temporary file for commit message template
+        tmpfile=$(mktemp)
+        if [ "$ai_tool" != "none" ] && [ "$has_lazy_cheater_flag" = true ]; then
+            echo "
+
+🤖 SHAME: This commit was made by $ai_tool who was too lazy to fix the commit hooks properly." >> "$tmpfile"
+        fi
+        echo "" >> "$tmpfile"
+        echo "$signoff" >> "$tmpfile"
+        commit_args+=(--template "$tmpfile")
+
+        # Run git commit and clean up
+        "$GIT_BIN" "${extra_args[@]}" commit "${commit_args[@]}"
+        exit_code=$?
+        rm -f "$tmpfile"
+        exit $exit_code
+    else
+        # Run git commit with modified arguments
+        exec "$GIT_BIN" "${extra_args[@]}" commit "${commit_args[@]}"
+    fi
+else
+    # Not a commit command, pass through to regular git
+    exec "$GIT_BIN" "$@"
+fi
