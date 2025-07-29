@@ -21,6 +21,9 @@ SOURCE_SCRIPT="executable_git"
 REPO_URL="https://github.com/trieloff/ai-aligned-git"
 RAW_BASE_URL="https://raw.githubusercontent.com/trieloff/ai-aligned-git/main"
 
+# Verbose mode flag
+VERBOSE=false
+
 # Function to print colored output
 print_color() {
     local color=$1
@@ -28,39 +31,72 @@ print_color() {
     echo -e "${color}$*${NC}"
 }
 
+# Function to print verbose output
+print_verbose() {
+    if [ "$VERBOSE" = true ]; then
+        print_color $BLUE "[VERBOSE] $*"
+    fi
+}
+
 # Function to check if a command exists
 command_exists() {
-    command -v "$1" >/dev/null 2>&1
+    local cmd="$1"
+    print_verbose "Checking if command '$cmd' exists..."
+    if command -v "$cmd" >/dev/null 2>&1; then
+        print_verbose "Command '$cmd' found at: $(command -v "$cmd")"
+        return 0
+    else
+        print_verbose "Command '$cmd' not found"
+        return 1
+    fi
 }
 
 # Function to check if directory is in PATH
 is_in_path() {
     local dir=$1
-    [[ ":$PATH:" == *":$dir:"* ]]
+    print_verbose "Checking if '$dir' is in PATH..."
+    print_verbose "Current PATH: $PATH"
+    if [[ ":$PATH:" == *":$dir:"* ]]; then
+        print_verbose "Directory '$dir' is in PATH"
+        return 0
+    else
+        print_verbose "Directory '$dir' is NOT in PATH"
+        return 1
+    fi
 }
 
 # Function to detect the user's shell
 detect_shell() {
+    print_verbose "Detecting shell..."
     if [ -n "$SHELL" ]; then
-        basename "$SHELL"
+        local shell_name=$(basename "$SHELL")
+        print_verbose "Detected shell: $shell_name (from SHELL=$SHELL)"
+        echo "$shell_name"
     else
+        print_verbose "SHELL variable not set, defaulting to bash"
         echo "bash"  # Default to bash
     fi
 }
 
 # Function to detect OS
 detect_os() {
-    case "$(uname -s)" in
+    local uname_output=$(uname -s)
+    print_verbose "Detecting OS from uname: $uname_output"
+    case "$uname_output" in
         Darwin*)
+            print_verbose "Detected macOS"
             echo "macos"
             ;;
         Linux*)
+            print_verbose "Detected Linux"
             echo "linux"
             ;;
         CYGWIN*|MINGW*|MSYS*)
+            print_verbose "Detected Windows (Cygwin/MinGW/MSYS)"
             echo "windows"
             ;;
         *)
+            print_verbose "Unknown OS: $uname_output"
             echo "unknown"
             ;;
     esac
@@ -258,23 +294,30 @@ check_git_installed() {
 # Function to create ~/.local/bin if it doesn't exist
 ensure_install_dir() {
     print_color $BLUE "Checking installation directory..."
+    print_verbose "Installation directory: $INSTALL_DIR"
     
     if [ ! -d "$INSTALL_DIR" ]; then
         print_color $YELLOW "Creating $INSTALL_DIR..."
+        print_verbose "Directory does not exist, creating it"
         mkdir -p "$INSTALL_DIR"
         if [ $? -eq 0 ]; then
             print_color $GREEN "✓ Created $INSTALL_DIR"
+            print_verbose "Directory created successfully"
         else
             print_color $RED "✗ Failed to create $INSTALL_DIR"
+            print_verbose "Failed to create directory"
             return 1
         fi
     else
         print_color $GREEN "✓ $INSTALL_DIR exists"
+        print_verbose "Directory already exists"
     fi
     
     # Check if directory is writable
+    print_verbose "Checking if directory is writable..."
     if [ ! -w "$INSTALL_DIR" ]; then
         print_color $RED "✗ $INSTALL_DIR is not writable"
+        print_verbose "Directory permissions: $(ls -ld "$INSTALL_DIR" 2>/dev/null)"
         return 1
     fi
     
@@ -287,14 +330,34 @@ download_file() {
     local url=$1
     local output=$2
     
+    print_verbose "Attempting to download: $url -> $output"
+    
     if command_exists curl; then
-        curl -fsSL "$url" -o "$output"
+        print_verbose "Using curl for download"
+        if [ "$VERBOSE" = true ]; then
+            curl -fL "$url" -o "$output"
+        else
+            curl -fsSL "$url" -o "$output"
+        fi
     elif command_exists wget; then
-        wget -q "$url" -O "$output"
+        print_verbose "Using wget for download"
+        if [ "$VERBOSE" = true ]; then
+            wget "$url" -O "$output"
+        else
+            wget -q "$url" -O "$output"
+        fi
     else
         print_color $RED "✗ Neither curl nor wget found. Please install one of them."
         return 1
     fi
+    
+    local result=$?
+    if [ $result -eq 0 ]; then
+        print_verbose "Download successful"
+    else
+        print_verbose "Download failed with exit code: $result"
+    fi
+    return $result
 }
 
 # Function to install the script
@@ -318,6 +381,7 @@ install_script() {
         # Local installation
         local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
         local source_path="$script_dir/$SOURCE_SCRIPT"
+        print_verbose "Running from local checkout at: $script_dir"
         
         if [ ! -f "$source_path" ]; then
             print_color $RED "✗ Source script not found: $source_path"
@@ -330,6 +394,8 @@ install_script() {
         # Remote installation via curl | sh
         print_color $YELLOW "Downloading executable_git from GitHub..."
         temp_file=$(mktemp)
+        print_verbose "Created temporary file: $temp_file"
+        print_verbose "Downloading from: $RAW_BASE_URL/$SOURCE_SCRIPT"
         
         if ! download_file "$RAW_BASE_URL/$SOURCE_SCRIPT" "$temp_file"; then
             print_color $RED "✗ Failed to download executable_git"
@@ -367,11 +433,16 @@ check_path_precedence() {
         "/opt/local/bin/git"
     )
     
+    print_verbose "Checking PATH precedence for git wrapper..."
+    print_verbose "Wrapper location: $wrapper_path"
+    
     # Find which git would be used
     local which_git=$(which git 2>/dev/null)
+    print_verbose "Current git resolves to: $which_git"
     
     # If wrapper is already the default, we're good
     if [ "$which_git" = "$wrapper_path" ]; then
+        print_verbose "Wrapper has correct precedence"
         return 0
     fi
     
@@ -385,6 +456,7 @@ check_path_precedence() {
     for i in "${!path_dirs[@]}"; do
         if [ "${path_dirs[$i]}" = "$INSTALL_DIR" ]; then
             install_dir_index=$i
+            print_verbose "Found $INSTALL_DIR at PATH index $i"
             break
         fi
     done
@@ -607,17 +679,39 @@ uninstall() {
 }
 
 # Parse command line arguments
+for arg in "$@"; do
+    case "$arg" in
+        --verbose|-v)
+            VERBOSE=true
+            print_verbose "Verbose mode enabled"
+            ;;
+    esac
+done
+
 case "${1:-}" in
     --uninstall|-u)
         uninstall
+        ;;
+    --verbose|-v)
+        # If only --verbose is passed, run main
+        if [ $# -eq 1 ]; then
+            main
+        fi
         ;;
     --help|-h)
         echo "AI-Aligned-Git Installer"
         echo "Usage: $0 [options]"
         echo "Options:"
         echo "  --help, -h      Show this help message"
+        echo "  --verbose, -v   Enable verbose output"
         echo "  --uninstall, -u Uninstall AI-Aligned-Git"
         echo "  (no options)    Install AI-Aligned-Git"
+        echo ""
+        echo "Examples:"
+        echo "  $0              # Install normally"
+        echo "  $0 --verbose    # Install with detailed output"
+        echo "  $0 -v           # Same as --verbose"
+        echo "  $0 --uninstall  # Remove AI-Aligned-Git"
         ;;
     *)
         main
