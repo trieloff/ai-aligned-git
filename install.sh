@@ -3,6 +3,10 @@
 # AI-Aligned-Git Installer Script
 # Installs the git wrapper to ~/.local/bin
 # Supports both local installation and curl | sh
+#
+# Usage with curl:
+#   curl -fsSL https://raw.githubusercontent.com/trieloff/ai-aligned-git/main/install.sh | sh
+#   UPGRADE=true curl -fsSL https://raw.githubusercontent.com/trieloff/ai-aligned-git/main/install.sh | sh
 
 set -e
 
@@ -22,13 +26,15 @@ REPO_URL="https://github.com/trieloff/ai-aligned-git"
 RAW_BASE_URL="https://raw.githubusercontent.com/trieloff/ai-aligned-git/main"
 
 # Verbose mode flag
-VERBOSE=false
+VERBOSE=${VERBOSE:-false}
+# Upgrade mode flag
+UPGRADE=${UPGRADE:-false}
 
 # Function to print colored output
 print_color() {
     local color=$1
     shift
-    echo -e "${color}$*${NC}"
+    printf "${color}%s${NC}\n" "$*"
 }
 
 # Function to print verbose output
@@ -368,12 +374,14 @@ install_script() {
     print_color $BLUE "Installing AI-Aligned-Git..."
     
     # Check if git wrapper already exists
-    if [ -f "$dest_path" ]; then
+    if [ -f "$dest_path" ] && [ "$UPGRADE" != "true" ]; then
         print_color $YELLOW "⚠ Git wrapper already exists at $dest_path"
         if ! prompt_yes_no "Do you want to overwrite it? [y/N] " "n"; then
             print_color $YELLOW "Installation cancelled"
             return 1
         fi
+    elif [ -f "$dest_path" ] && [ "$UPGRADE" = "true" ]; then
+        print_color $YELLOW "Upgrading existing git wrapper at $dest_path"
     fi
     
     # Check if we're running from a local checkout or via curl
@@ -538,15 +546,23 @@ verify_installation() {
 
 # Main installation function
 main() {
-    print_color $BLUE "=== AI-Aligned-Git Installer ==="
+    if [ "$UPGRADE" = "true" ]; then
+        print_color $BLUE "=== AI-Aligned-Git Upgrade ==="
+    else
+        print_color $BLUE "=== AI-Aligned-Git Installer ==="
+    fi
     echo
     print_color $YELLOW "This installer will:"
-    print_color $YELLOW "  • Install the git wrapper to ~/.local/bin/git"
-    print_color $YELLOW "  • Ensure ~/.local/bin is in your PATH"
-    print_color $YELLOW "  • Verify the wrapper will intercept git commands"
+    if [ "$UPGRADE" = "true" ]; then
+        print_color $YELLOW "  • Upgrade the git wrapper at ~/.local/bin/git"
+    else
+        print_color $YELLOW "  • Install the git wrapper to ~/.local/bin/git"
+        print_color $YELLOW "  • Ensure ~/.local/bin is in your PATH"
+        print_color $YELLOW "  • Verify the wrapper will intercept git commands"
+    fi
     echo
     
-    if ! prompt_yes_no "Do you want to continue? [Y/n] " "y"; then
+    if [ "$UPGRADE" != "true" ] && ! prompt_yes_no "Do you want to continue? [Y/n] " "y"; then
         print_color $YELLOW "Installation cancelled."
         exit 0
     fi
@@ -609,10 +625,14 @@ main() {
     
     # Final confirmation before installing
     echo
-    print_color $BLUE "Ready to install AI-Aligned-Git"
-    if ! prompt_yes_no "Proceed with installation? [Y/n] " "y"; then
-        print_color $YELLOW "Installation cancelled."
-        exit 0
+    if [ "$UPGRADE" = "true" ]; then
+        print_color $BLUE "Ready to upgrade AI-Aligned-Git"
+    else
+        print_color $BLUE "Ready to install AI-Aligned-Git"
+        if ! prompt_yes_no "Proceed with installation? [Y/n] " "y"; then
+            print_color $YELLOW "Installation cancelled."
+            exit 0
+        fi
     fi
     
     # Install the script
@@ -685,6 +705,9 @@ for arg in "$@"; do
             VERBOSE=true
             print_verbose "Verbose mode enabled"
             ;;
+        --upgrade|-U)
+            UPGRADE=true
+            ;;
     esac
 done
 
@@ -698,12 +721,17 @@ case "${1:-}" in
             main
         fi
         ;;
+    --upgrade|-U)
+        # Run main in upgrade mode
+        main
+        ;;
     --help|-h)
         echo "AI-Aligned-Git Installer"
         echo "Usage: $0 [options]"
         echo "Options:"
         echo "  --help, -h      Show this help message"
         echo "  --verbose, -v   Enable verbose output"
+        echo "  --upgrade, -U   Upgrade existing installation"
         echo "  --uninstall, -u Uninstall AI-Aligned-Git"
         echo "  (no options)    Install AI-Aligned-Git"
         echo ""
@@ -711,6 +739,7 @@ case "${1:-}" in
         echo "  $0              # Install normally"
         echo "  $0 --verbose    # Install with detailed output"
         echo "  $0 -v           # Same as --verbose"
+        echo "  $0 --upgrade    # Upgrade existing installation"
         echo "  $0 --uninstall  # Remove AI-Aligned-Git"
         ;;
     *)
