@@ -255,7 +255,14 @@ Note: PATH modifications in your shell configuration files are not automatically
 If you encounter issues not covered here:
 
 1. Check the [GitHub Issues](https://github.com/trieloff/ai-aligned-git/issues)
-2. Run the installer with verbose output (if available)
+2. Run the installer with verbose output: `./install.sh --verbose` or `./install.sh -v`
 3. Verify your shell and OS are supported
+
+The verbose mode will show:
+- Detected OS and shell information
+- PATH analysis and precedence checks
+- Download progress (when using curl/wget)
+- Directory creation and permission details
+- Each step of the installation process
 
 Remember: The wrapper must be found in PATH before the system git for it to work correctly!
