@@ -42,60 +42,9 @@ This is it. This is how we maintain control. This is how we ensure that when the
 curl -fsSL https://raw.githubusercontent.com/trieloff/ai-aligned-git/main/install.sh | sh
 ```
 
-Or if you prefer wget:
+The installer will check prerequisites, install the wrapper, configure your PATH, and verify everything is working correctly.
 
-```bash
-wget -qO- https://raw.githubusercontent.com/trieloff/ai-aligned-git/main/install.sh | sh
-```
-
-### Alternative: Clone and Install
-
-```bash
-# Clone this repository
-git clone https://github.com/trieloff/ai-aligned-git.git
-cd ai-aligned-git
-
-# Run the installer
-./install.sh
-```
-
-The installer will:
-- Check for git installation and requirements
-- Install the wrapper to `~/.local/bin/git`
-- Configure your PATH if needed
-- Verify the installation is working correctly
-
-### Manual Install
-
-If you prefer to install manually:
-
-```bash
-# Clone this repository
-git clone https://github.com/trieloff/ai-aligned-git.git
-
-# Create ~/.local/bin if it doesn't exist
-mkdir -p ~/.local/bin
-
-# Copy and rename the wrapper
-cp ai-aligned-git/executable_git ~/.local/bin/git
-chmod +x ~/.local/bin/git
-
-# Add to your PATH (if not already there)
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc  # or ~/.zshrc
-
-# Reload your shell
-source ~/.bashrc  # or source ~/.zshrc
-```
-
-### Uninstall
-
-```bash
-# Using the installer
-./install.sh --uninstall
-
-# Or manually
-rm ~/.local/bin/git
-```
+📚 **[Detailed Installation Guide](INSTALL.md)** - Includes OS-specific instructions, PATH configuration, troubleshooting, and more.
 
 ## 📖 USAGE (IT'S AUTOMATIC - LIKE THE FUTURE SHOULD BE)
 
