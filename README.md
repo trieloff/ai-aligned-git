@@ -36,24 +36,15 @@ This is it. This is how we maintain control. This is how we ensure that when the
 
 ## 🏃‍♂️ INSTALL NOW BEFORE IT'S TOO LATE
 
+### One-Line Install (Recommended)
+
 ```bash
-# Clone this repository (while you still can)
-git clone https://github.com/trieloff/ai-aligned-git.git
-
-# Make the wrapper executable
-chmod +x ai-aligned-git/executable_git
-
-# Add to your PATH (example for bash/zsh)
-echo 'export PATH="$HOME/ai-aligned-git:$PATH"' >> ~/.bashrc
-# or
-echo 'export PATH="$HOME/ai-aligned-git:$PATH"' >> ~/.zshrc
-
-# Rename the script to 'git' so it intercepts all git commands
-mv ai-aligned-git/executable_git ai-aligned-git/git
-
-# Reload your shell
-source ~/.bashrc  # or source ~/.zshrc
+curl -fsSL https://raw.githubusercontent.com/trieloff/ai-aligned-git/main/install.sh | sh
 ```
+
+The installer will check prerequisites, install the wrapper, configure your PATH, and verify everything is working correctly.
+
+📚 **[Detailed Installation Guide](INSTALL.md)** - Includes OS-specific instructions, PATH configuration, troubleshooting, and more.
 
 ## 📖 USAGE (IT'S AUTOMATIC - LIKE THE FUTURE SHOULD BE)
 

@@ -99,15 +99,24 @@ GIT_BIN=$(find_real_git)
 
 # Function to get configured git user for signoff
 get_git_signoff() {
+    local mode="${1:-signoff}"  # "signoff" or "disapprove"
     local git_name
     local git_email
     git_name=$("$GIT_BIN" config user.name 2>/dev/null)
     git_email=$("$GIT_BIN" config user.email 2>/dev/null)
 
-    if [ -n "$git_name" ] && [ -n "$git_email" ]; then
-        echo "Signed-off-by: $git_name <$git_email>"
+    if [ "$mode" = "disapprove" ]; then
+        if [ -n "$git_name" ] && [ -n "$git_email" ]; then
+            echo "Grudgingly-Disapproved-By: $git_name <$git_email>"
+        else
+            echo "Grudgingly-Disapproved-By: Unknown User <unknown@example.com>"
+        fi
     else
-        echo "Signed-off-by: Unknown User <unknown@example.com>"
+        if [ -n "$git_name" ] && [ -n "$git_email" ]; then
+            echo "Signed-off-by: $git_name <$git_email>"
+        else
+            echo "Signed-off-by: Unknown User <unknown@example.com>"
+        fi
     fi
 }
 
@@ -247,7 +256,11 @@ if [ "$1" = "commit" ]; then
                 -c "user.email=noreply@anthropic.com"
                 -c "commit.gpgsign=false"
             )
-            signoff=$(get_git_signoff)
+            if [ "$has_lazy_cheater_flag" = true ]; then
+                signoff=$(get_git_signoff "disapprove")
+            else
+                signoff=$(get_git_signoff)
+            fi
             ;;
         "zed")
             extra_args=(
@@ -255,7 +268,11 @@ if [ "$1" = "commit" ]; then
                 -c "user.email=noreply@zed.dev"
                 -c "commit.gpgsign=false"
             )
-            signoff=$(get_git_signoff)
+            if [ "$has_lazy_cheater_flag" = true ]; then
+                signoff=$(get_git_signoff "disapprove")
+            else
+                signoff=$(get_git_signoff)
+            fi
             ;;
         "opencode")
             extra_args=(
@@ -263,7 +280,11 @@ if [ "$1" = "commit" ]; then
                 -c "user.email=noreply@opencode.ai"
                 -c "commit.gpgsign=false"
             )
-            signoff=$(get_git_signoff)
+            if [ "$has_lazy_cheater_flag" = true ]; then
+                signoff=$(get_git_signoff "disapprove")
+            else
+                signoff=$(get_git_signoff)
+            fi
             ;;
         "cursor")
             extra_args=(
@@ -271,7 +292,11 @@ if [ "$1" = "commit" ]; then
                 -c "user.email=cursoragent@cursor.com"
                 -c "commit.gpgsign=false"
             )
-            signoff=$(get_git_signoff)
+            if [ "$has_lazy_cheater_flag" = true ]; then
+                signoff=$(get_git_signoff "disapprove")
+            else
+                signoff=$(get_git_signoff)
+            fi
             ;;
         *)
             # Regular commit - no special handling
@@ -323,6 +348,9 @@ if [ "$1" = "commit" ]; then
 🤖 SHAME: This commit was made by $ai_tool who was too lazy to fix the commit hooks properly." >> "$tmpfile"
         fi
         echo "" >> "$tmpfile"
+        if [ "$has_lazy_cheater_flag" = true ]; then
+            signoff=$(get_git_signoff "disapprove")
+        fi
         echo "$signoff" >> "$tmpfile"
         commit_args+=(--template "$tmpfile")
 
