@@ -384,6 +384,16 @@ install_script() {
         print_color $YELLOW "Upgrading existing git wrapper at $dest_path"
     fi
     
+    # Remove existing file if upgrading
+    if [ "$UPGRADE" = "true" ] && [ -f "$dest_path" ]; then
+        print_verbose "Removing existing wrapper for upgrade"
+        rm -f "$dest_path"
+        if [ $? -ne 0 ]; then
+            print_color $RED "✗ Failed to remove existing wrapper for upgrade"
+            return 1
+        fi
+    fi
+    
     # Check if we're running from a local checkout or via curl
     if [ -t 0 ] && [ -f "$(dirname "${BASH_SOURCE[0]}")/$SOURCE_SCRIPT" ]; then
         # Local installation
