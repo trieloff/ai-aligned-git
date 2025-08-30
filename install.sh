@@ -414,7 +414,10 @@ install_script() {
         fi
         
         # Copy the script
-        cp "$source_path" "$dest_path"
+        if ! cp "$source_path" "$dest_path"; then
+            print_color "$RED" "✗ Failed to copy script to $dest_path"
+            return 1
+        fi
     else
         # Remote installation via curl | sh
         print_color "$YELLOW" "Downloading executable_git from GitHub..."
@@ -433,12 +436,6 @@ install_script() {
             print_color "$RED" "✗ Failed to install script"
             return 1
         fi
-    fi
-    
-    # Check the copy/move succeeded
-    if [ ! -f "$dest_path" ]; then
-        print_color "$RED" "✗ Failed to install script"
-        return 1
     fi
     
     # Make it executable
