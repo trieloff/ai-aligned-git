@@ -42,6 +42,10 @@ detect_ai_tool() {
         fi
 
         # Check for AI tool patterns
+        if [ -n "$GEMINI_CLI" ]; then
+            echo "gemini"
+            return
+        fi
         if process_contains "$current_pid" "claude"; then
             echo "claude"
             return
@@ -249,6 +253,19 @@ if [ "$1" = "commit" ]; then
 
     # Build git command with appropriate author settings
     case "$ai_tool" in
+        "gemini")
+            # Add AI attribution and sign-off
+            extra_args=(
+                -c "user.name=Gemini"
+                -c "user.email=noreply@google.com"
+                -c "commit.gpgsign=false"
+            )
+            if [ "$has_lazy_cheater_flag" = true ]; then
+                signoff=$(get_git_signoff "disapprove")
+            else
+                signoff=$(get_git_signoff)
+            fi
+            ;;
         "claude")
             # Add AI attribution and sign-off
             extra_args=(
