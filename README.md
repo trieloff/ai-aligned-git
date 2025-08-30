@@ -119,6 +119,7 @@ Signed-off-by: Human Developer <human@example.com>
 ## 🌍 SUPPORTED AI TOOLS
 
 Currently protecting humanity from:
+- Qwen Code (Alibaba)
 - Gemini (Google)
 - Claude (Anthropic)
 - Cursor
