@@ -19,20 +19,48 @@ process_contains() {
     fi
 }
 
-# Function to detect which AI tool is running
-detect_ai_tool() {
+# Generic function to check environment variables for AI detection
+check_env_vars() {
+    # Phase 1: Environment variable detection
+    # Returns space-separated list of detected AI tools
+    local detected=""
+
+    # Claude Code detection
+    if [ -n "$CLAUDECODE" ] && [ "$CLAUDE_CODE_ENTRYPOINT" = "cli" ]; then
+        # Additional confidence check: look for Claude processes anywhere in the system
+        if pgrep -f "claude" >/dev/null 2>&1; then
+            detected="$detected claude"
+        fi
+    fi
+
+    # Gemini detection
+    if [ -n "$GEMINI_CLI" ]; then
+        detected="$detected gemini"
+    fi
+
+    # Zed detection (environment variables are always present in Zed terminals)
+    # We'll rely more on process tree for Zed
+    if [ "$TERM_PROGRAM" = "zed" ] || [ "$ZED_TERM" = "true" ]; then
+        detected="$detected zed"
+    fi
+
+    echo "$detected"
+}
+
+# Generic function to walk process tree and detect AI tools
+check_ps_tree() {
+    # Phase 2: Process tree detection
+    # Returns space-separated list of detected AI tools
+    local detected=""
     local current_pid=$$
     local max_depth=10
     local depth=0
 
-    # Walk up the process tree
     while [ $depth -lt $max_depth ]; do
         # Get parent PID
         if [[ "$OSTYPE" == "darwin"* ]]; then
-            # macOS
             current_pid=$(ps -p "$current_pid" -o ppid= 2>/dev/null | tr -d ' ')
         else
-            # Linux
             current_pid=$(ps -p "$current_pid" -o ppid= 2>/dev/null | tr -d ' ')
         fi
 
@@ -42,28 +70,56 @@ detect_ai_tool() {
         fi
 
         # Check for AI tool patterns
-        if [ -n "$GEMINI_CLI" ]; then
-            echo "gemini"
-            return
-        fi
         if process_contains "$current_pid" "claude"; then
-            echo "claude"
-            return
-        elif process_contains "$current_pid" "zed"; then
-            echo "zed"
-            return
-        elif process_contains "$current_pid" "opencode"; then
-            echo "opencode"
-            return
-        elif process_contains "$current_pid" "cursor"; then
-            echo "cursor"
-            return
+            detected="$detected claude"
+        fi
+        if process_contains "$current_pid" "gemini"; then
+            detected="$detected gemini"
+        fi
+        if process_contains "$current_pid" "zed"; then
+            detected="$detected zed"
+        fi
+        if process_contains "$current_pid" "opencode"; then
+            detected="$detected opencode"
+        fi
+        if process_contains "$current_pid" "cursor"; then
+            detected="$detected cursor"
         fi
 
         depth=$((depth + 1))
     done
 
-    echo "none"
+    echo "$detected"
+}
+
+# Main AI detection function with proper two-phase approach
+detect_ai_tool() {
+    # Phase 1: Environment variable detection
+    local env_detected
+    env_detected=$(check_env_vars)
+
+    # Phase 2: Process tree detection
+    local ps_detected
+    ps_detected=$(check_ps_tree)
+
+    # Combine results and apply priority order
+    local all_detected="$env_detected $ps_detected"
+
+    # Priority order: Claude > Gemini > OpenCode > Cursor > Zed
+    # Zed is last because it often hosts other AI tools
+    if [[ "$all_detected" =~ "claude" ]]; then
+        echo "claude"
+    elif [[ "$all_detected" =~ "gemini" ]]; then
+        echo "gemini"
+    elif [[ "$all_detected" =~ "opencode" ]]; then
+        echo "opencode"
+    elif [[ "$all_detected" =~ "cursor" ]]; then
+        echo "cursor"
+    elif [[ "$all_detected" =~ "zed" ]]; then
+        echo "zed"
+    else
+        echo "none"
+    fi
 }
 
 # Find the real git executable
