@@ -38,6 +38,21 @@ check_env_vars() {
         detected="$detected gemini"
     fi
 
+    # Qwen detection
+    if [ -n "$QWEN_CODE" ]; then
+        detected="$detected qwen"
+    fi
+
+    # Cursor detection
+    if [ -n "$CURSOR_AI" ]; then
+        detected="$detected cursor"
+    fi
+
+    # OpenCode detection
+    if [ -n "$OPENCODE_AI" ]; then
+        detected="$detected opencode"
+    fi
+
     # Zed detection (environment variables are always present in Zed terminals)
     # We'll rely more on process tree for Zed
     if [ "$TERM_PROGRAM" = "zed" ] || [ "$ZED_TERM" = "true" ]; then
@@ -70,19 +85,14 @@ check_ps_tree() {
         fi
 
         # Check for AI tool patterns
-        if [ -n "$GEMINI_CLI" ]; then
-            echo "gemini"
-            return
-        fi
-        if [ -n "$QWEN_CODE" ]; then
-            echo "qwen"
-            return
-        fi
         if process_contains "$current_pid" "claude"; then
             detected="$detected claude"
         fi
         if process_contains "$current_pid" "gemini"; then
             detected="$detected gemini"
+        fi
+        if process_contains "$current_pid" "qwen"; then
+            detected="$detected qwen"
         fi
         if process_contains "$current_pid" "zed"; then
             detected="$detected zed"
@@ -123,12 +133,14 @@ detect_ai_tool() {
     # Combine results and apply priority order
     local all_detected="$env_detected $ps_detected"
 
-    # Priority order: Claude > Gemini > OpenCode > Cursor > Zed
+    # Priority order: Claude > Gemini > Qwen > OpenCode > Cursor > Zed
     # Zed is last because it often hosts other AI tools
     if [[ "$all_detected" =~ "claude" ]]; then
         echo "claude"
     elif [[ "$all_detected" =~ "gemini" ]]; then
         echo "gemini"
+    elif [[ "$all_detected" =~ "qwen" ]]; then
+        echo "qwen"
     elif [[ "$all_detected" =~ "opencode" ]]; then
         echo "opencode"
     elif [[ "$all_detected" =~ "cursor" ]]; then
