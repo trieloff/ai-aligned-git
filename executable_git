@@ -70,6 +70,14 @@ check_ps_tree() {
         fi
 
         # Check for AI tool patterns
+        if [ -n "$GEMINI_CLI" ]; then
+            echo "gemini"
+            return
+        fi
+        if [ -n "$QWEN_CODE" ]; then
+            echo "qwen"
+            return
+        fi
         if process_contains "$current_pid" "claude"; then
             detected="$detected claude"
         fi
@@ -324,6 +332,19 @@ if [ "$1" = "commit" ]; then
             extra_args=(
                 -c "user.name=Gemini"
                 -c "user.email=noreply@google.com"
+                -c "commit.gpgsign=false"
+            )
+            if [ "$has_lazy_cheater_flag" = true ]; then
+                signoff=$(get_git_signoff "disapprove")
+            else
+                signoff=$(get_git_signoff)
+            fi
+            ;;
+        "qwen")
+            # Add AI attribution and sign-off
+            extra_args=(
+                -c "user.name=Qwen Code"
+                -c "user.email=noreply@alibaba.com"
                 -c "commit.gpgsign=false"
             )
             if [ "$has_lazy_cheater_flag" = true ]; then
