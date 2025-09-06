@@ -78,6 +78,16 @@ check_ps_tree() {
         fi
         if process_contains "$current_pid" "zed"; then
             detected="$detected zed"
+            # Special case: When we find Zed, also check for Claude processes that are siblings
+            # (children of the same Zed process) to handle nested AI scenarios
+            local zed_children
+            zed_children=$(pgrep -P "$current_pid" 2>/dev/null)
+            for child_pid in $zed_children; do
+                if process_contains "$child_pid" "claude"; then
+                    detected="$detected claude"
+                    break
+                fi
+            done
         fi
         if process_contains "$current_pid" "opencode"; then
             detected="$detected opencode"
