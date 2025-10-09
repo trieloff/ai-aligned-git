@@ -1,5 +1,5 @@
 #!/usr/bin/env zsh
-# ffs - "For F*ck's Sake" - Execute the previous command with sudo
+# ffs - "Friendly Following Sudo" - Execute the previous command with sudo
 # Usage:
 #   $ rm /etc/somefile
 #   Permission denied
