@@ -122,6 +122,7 @@ Currently protecting humanity from:
 - Qwen Code (Alibaba)
 - Gemini (Google)
 - Claude (Anthropic)
+- Droid (Factory AI)
 - Cursor
 - GitHub Copilot
 - Zed AI

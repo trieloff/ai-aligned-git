@@ -64,6 +64,11 @@ check_env_vars() {
         detected="$detected copilot"
     fi
 
+    # Droid detection (Factory AI)
+    if [ -n "$DROID_CLI" ]; then
+        detected="$detected droid"
+    fi
+
     echo "$detected"
 }
 
@@ -118,6 +123,9 @@ check_ps_tree() {
         if process_contains "$current_pid" "cursor"; then
             detected="$detected cursor"
         fi
+        if process_contains "$current_pid" "droid"; then
+            detected="$detected droid"
+        fi
 
         depth=$((depth + 1))
     done
@@ -138,7 +146,7 @@ detect_ai_tool() {
     # Combine results and apply priority order
     local all_detected="$env_detected $ps_detected"
 
-    # Priority order: Claude > Gemini > Qwen > OpenCode > Cursor > Copilot > Zed
+    # Priority order: Claude > Gemini > Qwen > Droid > OpenCode > Cursor > Copilot > Zed
     # Zed is last because it often hosts other AI tools
     if [[ "$all_detected" =~ "claude" ]]; then
         echo "claude"
@@ -146,6 +154,8 @@ detect_ai_tool() {
         echo "gemini"
     elif [[ "$all_detected" =~ "qwen" ]]; then
         echo "qwen"
+    elif [[ "$all_detected" =~ "droid" ]]; then
+        echo "droid"
     elif [[ "$all_detected" =~ "opencode" ]]; then
         echo "opencode"
     elif [[ "$all_detected" =~ "cursor" ]]; then
@@ -425,6 +435,18 @@ if [ "$1" = "commit" ]; then
             extra_args=(
                 -c "user.name=GitHub Copilot"
                 -c "user.email=copilot@github.com"
+                -c "commit.gpgsign=false"
+            )
+            if [ "$has_lazy_cheater_flag" = true ]; then
+                signoff=$(get_git_signoff "disapprove")
+            else
+                signoff=$(get_git_signoff)
+            fi
+            ;;
+        "droid")
+            extra_args=(
+                -c "user.name=Droid"
+                -c "user.email=droid@factory.ai"
                 -c "commit.gpgsign=false"
             )
             if [ "$has_lazy_cheater_flag" = true ]; then
