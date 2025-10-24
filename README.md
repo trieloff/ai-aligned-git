@@ -123,6 +123,7 @@ Currently protecting humanity from:
 - Gemini (Google)
 - Claude (Anthropic)
 - Cursor
+- GitHub Copilot
 - Zed AI
 - OpenCode
 
