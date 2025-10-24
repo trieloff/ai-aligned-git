@@ -2,8 +2,11 @@
 
 # Debug script to test AI detection
 
-# Source the functions from executable_git
-source ./executable_git
+# Load only the detection functions from executable_git to avoid exec side effects
+eval "$(sed -n '/^process_contains()/,/^}/p' executable_git)"
+eval "$(sed -n '/^check_env_vars()/,/^}/p' executable_git)"
+eval "$(sed -n '/^check_ps_tree()/,/^}/p' executable_git)"
+eval "$(sed -n '/^detect_ai_tool()/,/^}/p' executable_git)"
 
 echo "=== Debug AI Detection ==="
 echo "Current PID: $$"

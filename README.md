@@ -120,6 +120,7 @@ Signed-off-by: Human Developer <human@example.com>
 
 Currently protecting humanity from:
 - [Amp](https://ampcode.com) (Sourcegraph)
+- Codex CLI (OpenAI)
 - [Qwen Code](https://www.alibabacloud.com/en/solutions/generative-ai/qwen) (Alibaba)
 - [Gemini Code Assist](https://codeassist.google/) (Google)
 - [Claude Code](https://www.anthropic.com/claude-code) (Anthropic)
