@@ -53,6 +53,12 @@ check_env_vars() {
         detected="$detected opencode"
     fi
 
+    # Codex CLI detection (environment)
+    # Prefer process detection, but allow opt-in via env var if set
+    if [ -n "$CODEX_CLI" ]; then
+        detected="$detected codex"
+    fi
+
     # Zed detection (environment variables are always present in Zed terminals)
     # We'll rely more on process tree for Zed
     if [ "$TERM_PROGRAM" = "zed" ] || [ "$ZED_TERM" = "true" ]; then
@@ -105,6 +111,10 @@ check_ps_tree() {
         fi
         if process_contains "$current_pid" "gemini"; then
             detected="$detected gemini"
+        fi
+        # Detect Codex CLI by process name
+        if process_contains "$current_pid" "codex"; then
+            detected="$detected codex"
         fi
         if process_contains "$current_pid" "qwen"; then
             detected="$detected qwen"
@@ -160,10 +170,12 @@ detect_ai_tool() {
     # Combine results and apply priority order
     local all_detected="$env_detected $ps_detected"
 
-    # Priority order: Amp > Claude > Gemini > Qwen > Droid > OpenCode > Cursor > Copilot > Zed
+    # Priority order: Amp > Codex > Claude > Gemini > Qwen > Droid > OpenCode > Cursor > Copilot > Zed
     # Zed is last because it often hosts other AI tools
     if [[ "$all_detected" =~ "amp" ]]; then
         echo "amp"
+    elif [[ "$all_detected" =~ "codex" ]]; then
+        echo "codex"
     elif [[ "$all_detected" =~ "claude" ]]; then
         echo "claude"
     elif [[ "$all_detected" =~ "gemini" ]]; then
@@ -372,6 +384,19 @@ if [ "$1" = "commit" ]; then
 
     # Build git command with appropriate author settings
     case "$ai_tool" in
+        "codex")
+            # Add AI attribution and sign-off
+            extra_args=(
+                -c "user.name=Codex CLI"
+                -c "user.email=noreply@openai.com"
+                -c "commit.gpgsign=false"
+            )
+            if [ "$has_lazy_cheater_flag" = true ]; then
+                signoff=$(get_git_signoff "disapprove")
+            else
+                signoff=$(get_git_signoff)
+            fi
+            ;;
         "gemini")
             # Add AI attribution and sign-off
             extra_args=(

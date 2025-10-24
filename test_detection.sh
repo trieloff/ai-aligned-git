@@ -29,6 +29,11 @@ check_env_vars() {
         fi
     fi
 
+    # Codex CLI detection (env opt-in)
+    if [ -n "$CODEX_CLI" ]; then
+        detected="$detected codex"
+    fi
+
     # Zed detection
     if [ "$TERM_PROGRAM" = "zed" ] || [ "$ZED_TERM" = "true" ]; then
         detected="$detected zed"
@@ -66,6 +71,10 @@ check_ps_tree() {
             echo "  -> Found CLAUDE at depth $depth" >&2
             detected="$detected claude"
         fi
+        if process_contains "$current_pid" "codex"; then
+            echo "  -> Found CODEX at depth $depth" >&2
+            detected="$detected codex"
+        fi
         if process_contains "$current_pid" "zed"; then
             echo "  -> Found ZED at depth $depth" >&2
             detected="$detected zed"
@@ -92,8 +101,10 @@ detect_ai_tool() {
     local all_detected="$env_detected $ps_detected"
     echo "All detected: '$all_detected'" >&2
 
-    # Priority order: Claude > Cursor > Zed
-    if [[ "$all_detected" =~ "claude" ]]; then
+    # Priority order: Codex > Claude > Cursor > Zed
+    if [[ "$all_detected" =~ "codex" ]]; then
+        echo "codex"
+    elif [[ "$all_detected" =~ "claude" ]]; then
         echo "claude"
     elif [[ "$all_detected" =~ "cursor" ]]; then
         echo "cursor"
