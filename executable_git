@@ -26,7 +26,7 @@ check_env_vars() {
     local detected=""
 
     # Claude Code detection
-    if [ -n "$CLAUDECODE" ] && [ "$CLAUDE_CODE_ENTRYPOINT" = "cli" ]; then
+    if [ -n "$CLAUDECODE" ] && { [ "$CLAUDE_CODE_ENTRYPOINT" = "cli" ] || [ "$CLAUDE_CODE_ENTRYPOINT" = "sdk-ts" ]; }; then
         # Additional confidence check: look for Claude processes anywhere in the system
         if pgrep -f "claude" >/dev/null 2>&1; then
             detected="$detected claude"
