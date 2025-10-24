@@ -155,6 +155,7 @@ This repository is part of a larger movement to understand and manage the AI-ass
 
 - **[AI-Aligned-Git](https://github.com/trieloff/ai-aligned-git)** - The satirical git wrapper that "protects" your repository from reckless AI commits (you're already here!)
 - **[AI-Aligned-GH](https://github.com/trieloff/ai-aligned-gh)** - A transparent GitHub CLI wrapper that automatically detects AI usage and ensures proper attribution for all GitHub actions
+- **[YOLO](https://github.com/trieloff/yolo)** - An AI agent launcher that adds the right bypass flags and can isolate work in git worktrees
 - **[Vibe-Coded-Badge-Action](https://github.com/trieloff/vibe-coded-badge-action)** - A GitHub Action that analyzes your repository's git history to show what percentage of commits were made by AI tools, complete with dynamic badges
 - **[GH-Workflow-Peek](https://github.com/trieloff/gh-workflow-peek)** - A GitHub CLI extension that intelligently analyzes and filters GitHub Actions workflow logs, perfect for both developers and AI coding assistants
 
