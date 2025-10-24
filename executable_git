@@ -424,7 +424,7 @@ if [ "$1" = "commit" ]; then
         "copilot")
             extra_args=(
                 -c "user.name=GitHub Copilot"
-                -c "user.email=noreply@github.com"
+                -c "user.email=copilot@github.com"
                 -c "commit.gpgsign=false"
             )
             if [ "$has_lazy_cheater_flag" = true ]; then
