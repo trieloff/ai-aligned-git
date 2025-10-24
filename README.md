@@ -119,7 +119,7 @@ Signed-off-by: Human Developer <human@example.com>
 ## 🌍 SUPPORTED AI TOOLS
 
 Currently protecting humanity from:
-- Amp (Sourcegraph)
+- [Amp](https://ampcode.com) (Sourcegraph)
 - Qwen Code (Alibaba)
 - Gemini (Google)
 - Claude (Anthropic)
