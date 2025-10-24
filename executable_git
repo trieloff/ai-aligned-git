@@ -123,8 +123,17 @@ check_ps_tree() {
         if process_contains "$current_pid" "cursor"; then
             detected="$detected cursor"
         fi
-        if process_contains "$current_pid" "droid"; then
-            detected="$detected droid"
+        # Droid detection - use word boundary to avoid matching android-studio, etc.
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            if ps -p "$current_pid" -o comm= 2>/dev/null | grep -qiw "droid" || \
+               ps -p "$current_pid" -o command= 2>/dev/null | grep -qiw "droid"; then
+                detected="$detected droid"
+            fi
+        else
+            if ps -p "$current_pid" -o comm= 2>/dev/null | grep -qiw "droid" || \
+               ps -p "$current_pid" -o cmd= 2>/dev/null | grep -qiw "droid"; then
+                detected="$detected droid"
+            fi
         fi
 
         depth=$((depth + 1))
