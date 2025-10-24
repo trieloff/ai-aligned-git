@@ -59,6 +59,11 @@ check_env_vars() {
         detected="$detected zed"
     fi
 
+    # Copilot detection
+    if [ "$GITHUB_COPILOT_CLI_MODE" = "true" ]; then
+        detected="$detected copilot"
+    fi
+
     echo "$detected"
 }
 
@@ -133,7 +138,7 @@ detect_ai_tool() {
     # Combine results and apply priority order
     local all_detected="$env_detected $ps_detected"
 
-    # Priority order: Claude > Gemini > Qwen > OpenCode > Cursor > Zed
+    # Priority order: Claude > Gemini > Qwen > OpenCode > Cursor > Copilot > Zed
     # Zed is last because it often hosts other AI tools
     if [[ "$all_detected" =~ "claude" ]]; then
         echo "claude"
@@ -145,6 +150,8 @@ detect_ai_tool() {
         echo "opencode"
     elif [[ "$all_detected" =~ "cursor" ]]; then
         echo "cursor"
+    elif [[ "$all_detected" =~ "copilot" ]]; then
+        echo "copilot"
     elif [[ "$all_detected" =~ "zed" ]]; then
         echo "zed"
     else
@@ -406,6 +413,18 @@ if [ "$1" = "commit" ]; then
             extra_args=(
                 -c "user.name=Cursor AI"
                 -c "user.email=cursoragent@cursor.com"
+                -c "commit.gpgsign=false"
+            )
+            if [ "$has_lazy_cheater_flag" = true ]; then
+                signoff=$(get_git_signoff "disapprove")
+            else
+                signoff=$(get_git_signoff)
+            fi
+            ;;
+        "copilot")
+            extra_args=(
+                -c "user.name=GitHub Copilot"
+                -c "user.email=noreply@github.com"
                 -c "commit.gpgsign=false"
             )
             if [ "$has_lazy_cheater_flag" = true ]; then
