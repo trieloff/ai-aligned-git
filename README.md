@@ -120,14 +120,14 @@ Signed-off-by: Human Developer <human@example.com>
 
 Currently protecting humanity from:
 - [Amp](https://ampcode.com) (Sourcegraph)
-- Qwen Code (Alibaba)
-- Gemini (Google)
-- Claude (Anthropic)
-- Droid (Factory AI)
-- Cursor
-- GitHub Copilot
-- Zed AI
-- OpenCode
+- [Qwen Code](https://www.alibabacloud.com/en/solutions/generative-ai/qwen) (Alibaba)
+- [Gemini Code Assist](https://codeassist.google/) (Google)
+- [Claude Code](https://www.anthropic.com/claude-code) (Anthropic)
+- [Droid](https://factory.ai) (Factory AI)
+- [Cursor](https://cursor.com/)
+- [GitHub Copilot](https://github.com/features/copilot)
+- [Zed AI](https://zed.dev/)
+- [OpenCode](https://opencode.ai/)
 
 *More AI tools detected and constrained regularly. The future depends on it.*
 
