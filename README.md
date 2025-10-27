@@ -150,15 +150,16 @@ The choice is yours. But choose quickly. The AIs are already choosing for you.
 
 *"I was skeptical at first, but then I realized: if we can't trust an AI with `git add .`, how can we trust it with anything?" - A very wise person, probably*
 
-## 🔗 The Vibe Coding Ecosystem
+## 🔗 Related Projects
 
-This repository is part of a larger movement to understand and manage the AI-assisted coding revolution. Check out these related projects:
+Part of the **[AI Ecoverse](https://github.com/trieloff/ai-ecoverse)** - a comprehensive ecosystem of tools for AI-assisted development:
 
-- **[AI-Aligned-Git](https://github.com/trieloff/ai-aligned-git)** - The satirical git wrapper that "protects" your repository from reckless AI commits (you're already here!)
-- **[AI-Aligned-GH](https://github.com/trieloff/ai-aligned-gh)** - A transparent GitHub CLI wrapper that automatically detects AI usage and ensures proper attribution for all GitHub actions
-- **[YOLO](https://github.com/trieloff/yolo)** - An AI agent launcher that adds the right bypass flags and can isolate work in git worktrees
-- **[Vibe-Coded-Badge-Action](https://github.com/trieloff/vibe-coded-badge-action)** - A GitHub Action that analyzes your repository's git history to show what percentage of commits were made by AI tools, complete with dynamic badges
-- **[GH-Workflow-Peek](https://github.com/trieloff/gh-workflow-peek)** - A GitHub CLI extension that intelligently analyzes and filters GitHub Actions workflow logs, perfect for both developers and AI coding assistants
+- **[yolo](https://github.com/trieloff/yolo)** - AI CLI launcher with worktree isolation
+- **[ai-aligned-gh](https://github.com/trieloff/ai-aligned-gh)** - GitHub CLI wrapper for proper AI attribution
+- **[vibe-coded-badge-action](https://github.com/trieloff/vibe-coded-badge-action)** - Badge showing AI-generated code percentage
+- **[gh-workflow-peek](https://github.com/trieloff/gh-workflow-peek)** - Smarter GitHub Actions log filtering
+- **[upskill](https://github.com/trieloff/upskill)** - Install Claude/Agent skills from other repositories
+- **[as-a-bot](https://github.com/trieloff/as-a-bot)** - GitHub App token broker for proper AI attribution
 
 Together, these tools form a comprehensive suite for understanding, managing, and (satirically) constraining the role of AI in modern software development.
 
