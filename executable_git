@@ -85,9 +85,13 @@ check_env_vars() {
         detected="$detected kimi"
     fi
 
+# OpenHands detection
+    if [ "$OR_APP_NAME" = "OpenHands" ] || [ -n "$OR_SITE_URL" ]; then
+        detected="$detected openhands"
+    fi
+
     # Crush detection (no environment variables, relies on process tree)
     # Note: Crush is typically detected via process tree only
-
     echo "$detected"
 }
 
@@ -186,9 +190,10 @@ detect_ai_tool() {
     # Combine results and apply priority order
     local all_detected="$env_detected $ps_detected"
 
-    # Priority order: Amp > Codex > Claude > Gemini > Qwen > Droid > OpenCode > Cursor > Copilot > Kimi > Crush > Zed
+# Priority order: Amp > Codex > Claude > Gemini > Qwen > Droid > OpenCode > Cursor > Copilot > Kimi > OpenHands > Crush > Zed
     # Zed is last because it often hosts other AI tools
     # Kimi takes precedence over Zed as requested
+    # OpenHands comes before Zed but after more specific AI tools
     # Crush takes precedence over Zed but after other AI tools
     if [[ "$all_detected" =~ "amp" ]]; then
         echo "amp"
@@ -210,6 +215,8 @@ detect_ai_tool() {
         echo "copilot"
     elif [[ "$all_detected" =~ "kimi" ]]; then
         echo "kimi"
+    elif [[ "$all_detected" =~ "openhands" ]]; then
+        echo "openhands"
     elif [[ "$all_detected" =~ "crush" ]]; then
         echo "crush"
     elif [[ "$all_detected" =~ "zed" ]]; then
@@ -534,6 +541,18 @@ if [ "$1" = "commit" ]; then
             extra_args=(
                 -c "user.name=Kimi CLI"
                 -c "user.email=noreply@kimi.com"
+                -c "commit.gpgsign=false"
+            )
+            if [ "$has_lazy_cheater_flag" = true ]; then
+                signoff=$(get_git_signoff "disapprove")
+            else
+                signoff=$(get_git_signoff)
+            fi
+            ;;
+"openhands")
+            extra_args=(
+                -c "user.name=OpenHands"
+                -c "user.email=openhands@all-hands.dev"
                 -c "commit.gpgsign=false"
             )
             if [ "$has_lazy_cheater_flag" = true ]; then
