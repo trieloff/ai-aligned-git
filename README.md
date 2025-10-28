@@ -93,6 +93,24 @@ Date:   Mon Jan 20 10:30:00 2025 -0700
     Signed-off-by: Human Developer <human@example.com>
 ```
 
+### Crush Agent Example
+
+When Crush makes commits:
+
+```bash
+# Crush, properly constrained
+$ git add src/index.js
+$ git commit -m "Fixed bug in Crush"
+
+# Resulting commit:
+Author: Crush <crush@charm.land>
+Date:   Tue Oct 28 19:24:21 2025 +0100
+
+    Fixed bug in Crush
+    
+    Signed-off-by: Human Developer <human@example.com>
+```
+
 ### The Ultimate Shame Feature™️
 
 When an AI tries to bypass hooks:
@@ -124,6 +142,7 @@ Currently protecting humanity from:
 - [Qwen Code](https://www.alibabacloud.com/en/solutions/generative-ai/qwen) (Alibaba)
 - [Gemini Code Assist](https://codeassist.google/) (Google)
 - [Claude Code](https://www.anthropic.com/claude-code) (Anthropic)
+- [Crush](https://charm.sh/tools/crush/) (Charm)
 - [Droid](https://factory.ai) (Factory AI)
 - [Cursor](https://cursor.com/)
 - [GitHub Copilot](https://github.com/features/copilot)
