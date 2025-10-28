@@ -124,6 +124,7 @@ Currently protecting humanity from:
 - [Qwen Code](https://www.alibabacloud.com/en/solutions/generative-ai/qwen) (Alibaba)
 - [Gemini Code Assist](https://codeassist.google/) (Google)
 - [Claude Code](https://www.anthropic.com/claude-code) (Anthropic)
+- [Crush](https://charm.sh/tools/crush/) (Charm)
 - [Droid](https://factory.ai) (Factory AI)
 - [Cursor](https://cursor.com/)
 - [GitHub Copilot](https://github.com/features/copilot)
