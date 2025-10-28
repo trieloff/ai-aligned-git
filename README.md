@@ -130,6 +130,7 @@ Currently protecting humanity from:
 - [Zed AI](https://zed.dev/)
 - [OpenCode](https://opencode.ai/)
 - [Kimi CLI](https://kimi.com/) (Moonshot AI)
+- [OpenHands](https://openhands.ai/) (OpenHands AI)
 
 *More AI tools detected and constrained regularly. The future depends on it.*
 
