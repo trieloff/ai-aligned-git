@@ -110,17 +110,17 @@ detect_ai_tool() {
     local all_detected="$env_detected $ps_detected"
     echo "All detected: '$all_detected'" >&2
 
-    # Priority order: Codex > Claude > Cursor > Zed > Kimi
+    # Priority order: Codex > Claude > Cursor > Kimi > Zed
     if [[ "$all_detected" =~ "codex" ]]; then
         echo "codex"
     elif [[ "$all_detected" =~ "claude" ]]; then
         echo "claude"
     elif [[ "$all_detected" =~ "cursor" ]]; then
         echo "cursor"
-    elif [[ "$all_detected" =~ "zed" ]]; then
-        echo "zed"
     elif [[ "$all_detected" =~ "kimi" ]]; then
         echo "kimi"
+    elif [[ "$all_detected" =~ "zed" ]]; then
+        echo "zed"
     else
         echo "none"
     fi

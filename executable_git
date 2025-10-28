@@ -179,9 +179,9 @@ detect_ai_tool() {
     # Combine results and apply priority order
     local all_detected="$env_detected $ps_detected"
 
-    # Priority order: Amp > Codex > Claude > Gemini > Qwen > Droid > OpenCode > Cursor > Copilot > Zed > Kimi
+    # Priority order: Amp > Codex > Claude > Gemini > Qwen > Droid > OpenCode > Cursor > Copilot > Kimi > Zed
     # Zed is last because it often hosts other AI tools
-    # Kimi is last as it's a newer addition
+    # Kimi takes precedence over Zed as requested
     if [[ "$all_detected" =~ "amp" ]]; then
         echo "amp"
     elif [[ "$all_detected" =~ "codex" ]]; then
@@ -200,10 +200,10 @@ detect_ai_tool() {
         echo "cursor"
     elif [[ "$all_detected" =~ "copilot" ]]; then
         echo "copilot"
-    elif [[ "$all_detected" =~ "zed" ]]; then
-        echo "zed"
     elif [[ "$all_detected" =~ "kimi" ]]; then
         echo "kimi"
+    elif [[ "$all_detected" =~ "zed" ]]; then
+        echo "zed"
     else
         echo "none"
     fi
