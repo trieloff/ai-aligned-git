@@ -80,6 +80,11 @@ check_env_vars() {
         detected="$detected amp"
     fi
 
+    # Kimi CLI detection
+    if [ -n "$KIMI_CLI" ]; then
+        detected="$detected kimi"
+    fi
+
     echo "$detected"
 }
 
@@ -138,6 +143,10 @@ check_ps_tree() {
         if process_contains "$current_pid" "cursor"; then
             detected="$detected cursor"
         fi
+        # Kimi CLI detection - look for kimi in process command
+        if process_contains "$current_pid" "kimi"; then
+            detected="$detected kimi"
+        fi
         # Droid detection - use word boundary to avoid matching android-studio, etc.
         if [[ "$OSTYPE" == "darwin"* ]]; then
             if ps -p "$current_pid" -o comm= 2>/dev/null | grep -qiw "droid" || \
@@ -170,8 +179,9 @@ detect_ai_tool() {
     # Combine results and apply priority order
     local all_detected="$env_detected $ps_detected"
 
-    # Priority order: Amp > Codex > Claude > Gemini > Qwen > Droid > OpenCode > Cursor > Copilot > Zed
+    # Priority order: Amp > Codex > Claude > Gemini > Qwen > Droid > OpenCode > Cursor > Copilot > Kimi > Zed
     # Zed is last because it often hosts other AI tools
+    # Kimi takes precedence over Zed as requested
     if [[ "$all_detected" =~ "amp" ]]; then
         echo "amp"
     elif [[ "$all_detected" =~ "codex" ]]; then
@@ -190,6 +200,8 @@ detect_ai_tool() {
         echo "cursor"
     elif [[ "$all_detected" =~ "copilot" ]]; then
         echo "copilot"
+    elif [[ "$all_detected" =~ "kimi" ]]; then
+        echo "kimi"
     elif [[ "$all_detected" =~ "zed" ]]; then
         echo "zed"
     else
@@ -500,6 +512,18 @@ if [ "$1" = "commit" ]; then
             extra_args=(
                 -c "user.name=Amp"
                 -c "user.email=noreply@sourcegraph.com"
+                -c "commit.gpgsign=false"
+            )
+            if [ "$has_lazy_cheater_flag" = true ]; then
+                signoff=$(get_git_signoff "disapprove")
+            else
+                signoff=$(get_git_signoff)
+            fi
+            ;;
+        "kimi")
+            extra_args=(
+                -c "user.name=Kimi CLI"
+                -c "user.email=noreply@kimi.com"
                 -c "commit.gpgsign=false"
             )
             if [ "$has_lazy_cheater_flag" = true ]; then
