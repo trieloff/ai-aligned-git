@@ -129,6 +129,7 @@ Currently protecting humanity from:
 - [GitHub Copilot](https://github.com/features/copilot)
 - [Zed AI](https://zed.dev/)
 - [OpenCode](https://opencode.ai/)
+- [Kimi CLI](https://kimi.com/) (Moonshot AI)
 
 *More AI tools detected and constrained regularly. The future depends on it.*
 

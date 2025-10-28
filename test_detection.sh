@@ -39,6 +39,11 @@ check_env_vars() {
         detected="$detected zed"
     fi
 
+    # Kimi CLI detection
+    if [ -n "$KIMI_CLI" ]; then
+        detected="$detected kimi"
+    fi
+
     echo "$detected"
 }
 
@@ -83,6 +88,10 @@ check_ps_tree() {
             echo "  -> Found CURSOR at depth $depth" >&2
             detected="$detected cursor"
         fi
+        if process_contains "$current_pid" "kimi"; then
+            echo "  -> Found KIMI at depth $depth" >&2
+            detected="$detected kimi"
+        fi
 
         depth=$((depth + 1))
     done
@@ -101,7 +110,7 @@ detect_ai_tool() {
     local all_detected="$env_detected $ps_detected"
     echo "All detected: '$all_detected'" >&2
 
-    # Priority order: Codex > Claude > Cursor > Zed
+    # Priority order: Codex > Claude > Cursor > Zed > Kimi
     if [[ "$all_detected" =~ "codex" ]]; then
         echo "codex"
     elif [[ "$all_detected" =~ "claude" ]]; then
@@ -110,6 +119,8 @@ detect_ai_tool() {
         echo "cursor"
     elif [[ "$all_detected" =~ "zed" ]]; then
         echo "zed"
+    elif [[ "$all_detected" =~ "kimi" ]]; then
+        echo "kimi"
     else
         echo "none"
     fi
@@ -122,6 +133,7 @@ echo -e "\n=== Environment Variables ==="
 echo "CLAUDECODE: '$CLAUDECODE'"
 echo "CLAUDE_CODE_ENTRYPOINT: '$CLAUDE_CODE_ENTRYPOINT'"
 echo "TERM_PROGRAM: '$TERM_PROGRAM'"
+echo "KIMI_CLI: '$KIMI_CLI'"
 
 echo -e "\n=== Environment Detection ==="
 env_result=$(check_env_vars)
