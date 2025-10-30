@@ -95,6 +95,11 @@ check_env_vars() {
         detected="$detected openhands"
     fi
 
+    # Goose detection (Block)
+    if [ -n "$GOOSE_TERMINAL" ]; then
+        detected="$detected goose"
+    fi
+
     # Crush detection (no environment variables, relies on process tree)
     # Note: Crush is typically detected via process tree only
     echo "$detected"
@@ -166,6 +171,10 @@ check_ps_tree() {
         if process_contains "$current_pid" "crush"; then
             detected="$detected crush"
         fi
+        # Goose detection - look for goose in process command
+        if process_contains "$current_pid" "goose"; then
+            detected="$detected goose"
+        fi
         # Droid detection - use word boundary to avoid matching android-studio, etc.
         if [[ "$OSTYPE" == "darwin"* ]]; then
             if ps -p "$current_pid" -o comm= 2>/dev/null | grep -qiw "droid" || \
@@ -198,11 +207,12 @@ detect_ai_tool() {
     # Combine results and apply priority order
     local all_detected="$env_detected $ps_detected"
 
-# Priority order: Amp > Codex > Aider > Claude > Gemini > Qwen > Droid > OpenCode > Cursor > Copilot > Kimi > OpenHands > Crush > Zed
+# Priority order: Amp > Codex > Aider > Claude > Gemini > Qwen > Droid > OpenCode > Cursor > Copilot > Kimi > OpenHands > Crush > Goose > Zed
     # Zed is last because it often hosts other AI tools
     # Kimi takes precedence over Zed as requested
     # OpenHands comes before Zed but after more specific AI tools
     # Crush takes precedence over Zed but after other AI tools
+    # Goose comes after Crush but before Zed
     if [[ "$all_detected" =~ "amp" ]]; then
         echo "amp"
     elif [[ "$all_detected" =~ "codex" ]]; then
@@ -229,6 +239,8 @@ detect_ai_tool() {
         echo "openhands"
     elif [[ "$all_detected" =~ "crush" ]]; then
         echo "crush"
+    elif [[ "$all_detected" =~ "goose" ]]; then
+        echo "goose"
     elif [[ "$all_detected" =~ "zed" ]]; then
         echo "zed"
     else
@@ -596,6 +608,18 @@ if [ "$1" = "commit" ]; then
                 signoff=$(get_git_signoff)
             fi
             ;;
+        "goose")
+            extra_args=(
+                -c "user.name=Goose User"
+                -c "user.email=goose@opensource.block.xyz"
+                -c "commit.gpgsign=false"
+            )
+            if [ "$has_lazy_cheater_flag" = true ]; then
+                signoff=$(get_git_signoff "disapprove")
+            else
+                signoff=$(get_git_signoff)
+            fi
+            ;;
         *)
             # Regular commit - no special handling
             exec "$GIT_BIN" "$@"
@@ -621,7 +645,7 @@ if [ "$1" = "commit" ]; then
             if [ "$ai_tool" != "none" ] && [ "$has_lazy_cheater_flag" = true ]; then
                 commit_args+=("$arg
 
-🤖 SHAME: This commit was made by $ai_tool who was too lazy to fix the commit hooks properly.")
+?? SHAME: This commit was made by $ai_tool who was too lazy to fix the commit hooks properly.")
             else
                 commit_args+=("$arg")
             fi
@@ -643,7 +667,7 @@ if [ "$1" = "commit" ]; then
         if [ "$ai_tool" != "none" ] && [ "$has_lazy_cheater_flag" = true ]; then
             echo "
 
-🤖 SHAME: This commit was made by $ai_tool who was too lazy to fix the commit hooks properly." >> "$tmpfile"
+?? SHAME: This commit was made by $ai_tool who was too lazy to fix the commit hooks properly." >> "$tmpfile"
         fi
         echo "" >> "$tmpfile"
         if [ "$has_lazy_cheater_flag" = true ]; then
