@@ -60,7 +60,7 @@ check_env_vars() {
     fi
 
     # Aider detection
-    if [ -n "$AIDER_AI" ]; then
+    if [ "$OR_APP_NAME" = "Aider" ]; then
         detected="$detected aider"
     fi
 

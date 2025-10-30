@@ -13,6 +13,9 @@ CURSOR_AI=1 check_env_vars
 echo "Testing CODEX_CLI=1:"
 CODEX_CLI=1 check_env_vars
 
+echo "Testing OR_APP_NAME=Aider:"
+OR_APP_NAME=Aider check_env_vars
+
 echo "Testing OPENCODE_AI=1:"
 OPENCODE_AI=1 check_env_vars
 
