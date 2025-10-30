@@ -111,6 +111,24 @@ Date:   Tue Oct 28 19:24:21 2025 +0100
     Signed-off-by: Human Developer <human@example.com>
 ```
 
+### Goose Agent Example
+
+When Goose makes commits:
+
+```bash
+# Goose, properly constrained
+$ git add src/index.js
+$ git commit -m "Fixed bug in Goose"
+
+# Resulting commit:
+Author: Goose User <goose@opensource.block.xyz>
+Date:   Tue Oct 28 19:24:21 2025 +0100
+
+    Fixed bug in Goose
+    
+    Signed-off-by: Human Developer <human@example.com>
+```
+
 ### The Ultimate Shame Feature™️
 
 When an AI tries to bypass hooks:
@@ -144,6 +162,7 @@ Currently protecting humanity from:
 - [Gemini Code Assist](https://codeassist.google/) (Google)
 - [Claude Code](https://www.anthropic.com/claude-code) (Anthropic)
 - [Crush](https://charm.sh/tools/crush/) (Charm)
+- [Goose](https://github.com/block/goose) (Block)
 - [Droid](https://factory.ai) (Factory AI)
 - [Cursor](https://cursor.com/)
 - [GitHub Copilot](https://github.com/features/copilot)
