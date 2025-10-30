@@ -59,6 +59,11 @@ check_env_vars() {
         detected="$detected codex"
     fi
 
+    # Aider detection
+    if [ -n "$AIDER_AI" ]; then
+        detected="$detected aider"
+    fi
+
     # Zed detection (environment variables are always present in Zed terminals)
     # We'll rely more on process tree for Zed
     if [ "$TERM_PROGRAM" = "zed" ] || [ "$ZED_TERM" = "true" ]; then
@@ -128,6 +133,9 @@ check_ps_tree() {
         if process_contains "$current_pid" "codex"; then
             detected="$detected codex"
         fi
+        if process_contains "$current_pid" "aider"; then
+            detected="$detected aider"
+        fi
         if process_contains "$current_pid" "qwen"; then
             detected="$detected qwen"
         fi
@@ -190,7 +198,7 @@ detect_ai_tool() {
     # Combine results and apply priority order
     local all_detected="$env_detected $ps_detected"
 
-# Priority order: Amp > Codex > Claude > Gemini > Qwen > Droid > OpenCode > Cursor > Copilot > Kimi > OpenHands > Crush > Zed
+# Priority order: Amp > Codex > Aider > Claude > Gemini > Qwen > Droid > OpenCode > Cursor > Copilot > Kimi > OpenHands > Crush > Zed
     # Zed is last because it often hosts other AI tools
     # Kimi takes precedence over Zed as requested
     # OpenHands comes before Zed but after more specific AI tools
@@ -199,6 +207,8 @@ detect_ai_tool() {
         echo "amp"
     elif [[ "$all_detected" =~ "codex" ]]; then
         echo "codex"
+    elif [[ "$all_detected" =~ "aider" ]]; then
+        echo "aider"
     elif [[ "$all_detected" =~ "claude" ]]; then
         echo "claude"
     elif [[ "$all_detected" =~ "gemini" ]]; then
@@ -418,6 +428,19 @@ if [ "$1" = "commit" ]; then
             extra_args=(
                 -c "user.name=Codex CLI"
                 -c "user.email=noreply@openai.com"
+                -c "commit.gpgsign=false"
+            )
+            if [ "$has_lazy_cheater_flag" = true ]; then
+                signoff=$(get_git_signoff "disapprove")
+            else
+                signoff=$(get_git_signoff)
+            fi
+            ;;
+        "aider")
+            # Add AI attribution and sign-off
+            extra_args=(
+                -c "user.name=Aider"
+                -c "user.email=aider@aider.chat"
                 -c "commit.gpgsign=false"
             )
             if [ "$has_lazy_cheater_flag" = true ]; then
