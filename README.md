@@ -137,6 +137,7 @@ Signed-off-by: Human Developer <human@example.com>
 ## 🌍 SUPPORTED AI TOOLS
 
 Currently protecting humanity from:
+- [Aider](https://aider.chat/)
 - [Amp](https://ampcode.com) (Sourcegraph)
 - Codex CLI (OpenAI)
 - [Qwen Code](https://www.alibabacloud.com/en/solutions/generative-ai/qwen) (Alibaba)
