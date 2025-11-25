@@ -101,6 +101,10 @@ check_ps_tree() {
             echo "  -> Found CRUSH at depth $depth" >&2
             detected="$detected crush"
         fi
+        if process_contains "$current_pid" "auggie"; then
+            echo "  -> Found AUGGIE at depth $depth" >&2
+            detected="$detected auggie"
+        fi
 
         depth=$((depth + 1))
     done
@@ -119,7 +123,7 @@ detect_ai_tool() {
     local all_detected="$env_detected $ps_detected"
     echo "All detected: '$all_detected'" >&2
 
-    # Priority order: Codex > Claude > Cursor > Kimi > Crush > Zed
+    # Priority order: Codex > Claude > Cursor > Kimi > Crush > Auggie > Zed
     if [[ "$all_detected" =~ "codex" ]]; then
         echo "codex"
     elif [[ "$all_detected" =~ "claude" ]]; then
@@ -130,6 +134,8 @@ detect_ai_tool() {
         echo "kimi"
     elif [[ "$all_detected" =~ "crush" ]]; then
         echo "crush"
+    elif [[ "$all_detected" =~ "auggie" ]]; then
+        echo "auggie"
     elif [[ "$all_detected" =~ "zed" ]]; then
         echo "zed"
     else
