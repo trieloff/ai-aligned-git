@@ -44,7 +44,7 @@ check_env_vars() {
     fi
 
     # Cursor detection
-    if [ -n "$CURSOR_AI" ]; then
+    if [ -n "$CURSOR_AGENT" ]; then
         detected="$detected cursor"
     fi
 
@@ -165,7 +165,7 @@ check_ps_tree() {
         if process_contains "$current_pid" "opencode"; then
             detected="$detected opencode"
         fi
-        if process_contains "$current_pid" "cursor"; then
+        if process_contains "$current_pid" "cursor-agent"; then
             detected="$detected cursor"
         fi
         # Kimi CLI detection - look for kimi in process command
