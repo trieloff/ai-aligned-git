@@ -100,6 +100,11 @@ check_env_vars() {
         detected="$detected goose"
     fi
 
+    # Auggie detection (Augment Code)
+    if [ -n "$AUGMENT_SESSION_AUTH" ]; then
+        detected="$detected auggie"
+    fi
+
     # Crush detection (no environment variables, relies on process tree)
     # Note: Crush is typically detected via process tree only
     echo "$detected"
@@ -175,6 +180,10 @@ check_ps_tree() {
         if process_contains "$current_pid" "goose"; then
             detected="$detected goose"
         fi
+        # Auggie detection - look for auggie in process command
+        if process_contains "$current_pid" "auggie"; then
+            detected="$detected auggie"
+        fi
         # Droid detection - use word boundary to avoid matching android-studio, etc.
         if [[ "$OSTYPE" == "darwin"* ]]; then
             if ps -p "$current_pid" -o comm= 2>/dev/null | grep -qiw "droid" || \
@@ -207,12 +216,13 @@ detect_ai_tool() {
     # Combine results and apply priority order
     local all_detected="$env_detected $ps_detected"
 
-# Priority order: Amp > Codex > Aider > Claude > Gemini > Qwen > Droid > OpenCode > Cursor > Copilot > Kimi > OpenHands > Crush > Goose > Zed
+# Priority order: Amp > Codex > Aider > Claude > Gemini > Qwen > Droid > OpenCode > Cursor > Copilot > Kimi > OpenHands > Crush > Goose > Auggie > Zed
     # Zed is last because it often hosts other AI tools
     # Kimi takes precedence over Zed as requested
     # OpenHands comes before Zed but after more specific AI tools
     # Crush takes precedence over Zed but after other AI tools
     # Goose comes after Crush but before Zed
+    # Auggie comes after Goose but before Zed
     if [[ "$all_detected" =~ "amp" ]]; then
         echo "amp"
     elif [[ "$all_detected" =~ "codex" ]]; then
@@ -241,6 +251,8 @@ detect_ai_tool() {
         echo "crush"
     elif [[ "$all_detected" =~ "goose" ]]; then
         echo "goose"
+    elif [[ "$all_detected" =~ "auggie" ]]; then
+        echo "auggie"
     elif [[ "$all_detected" =~ "zed" ]]; then
         echo "zed"
     else
@@ -612,6 +624,18 @@ if [ "$1" = "commit" ]; then
             extra_args=(
                 -c "user.name=Goose User"
                 -c "user.email=goose@opensource.block.xyz"
+                -c "commit.gpgsign=false"
+            )
+            if [ "$has_lazy_cheater_flag" = true ]; then
+                signoff=$(get_git_signoff "disapprove")
+            else
+                signoff=$(get_git_signoff)
+            fi
+            ;;
+        "auggie")
+            extra_args=(
+                -c "user.name=Auggie"
+                -c "user.email=auggie@augmentcode.com"
                 -c "commit.gpgsign=false"
             )
             if [ "$has_lazy_cheater_flag" = true ]; then

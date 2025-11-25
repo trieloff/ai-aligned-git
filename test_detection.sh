@@ -44,6 +44,11 @@ check_env_vars() {
         detected="$detected kimi"
     fi
 
+    # Auggie detection
+    if [ -n "$AUGMENT_SESSION_AUTH" ]; then
+        detected="$detected auggie"
+    fi
+
     echo "$detected"
 }
 
