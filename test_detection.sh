@@ -45,7 +45,7 @@ check_env_vars() {
     fi
 
     # Auggie detection
-    if [ -n "$AUGMENT_SESSION_AUTH" ]; then
+    if [ -n "$AUGMENT_API_TOKEN" ]; then
         detected="$detected auggie"
     fi
 
