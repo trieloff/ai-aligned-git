@@ -126,7 +126,25 @@ Author: Goose User <goose@opensource.block.xyz>
 Date:   Tue Oct 28 19:24:21 2025 +0100
 
     Fixed bug in Goose
-    
+
+    Signed-off-by: Human Developer <human@example.com>
+```
+
+### Auggie Example
+
+When Auggie makes commits:
+
+```bash
+# Auggie, properly constrained
+$ git add src/index.js
+$ git commit -m "Refactored authentication logic"
+
+# Resulting commit:
+Author: Auggie <auggie@augmentcode.com>
+Date:   Mon Nov 25 14:30:00 2025 -0800
+
+    Refactored authentication logic
+
     Signed-off-by: Human Developer <human@example.com>
 ```
 
@@ -158,6 +176,7 @@ Signed-off-by: Human Developer <human@example.com>
 Currently protecting humanity from:
 - [Aider](https://aider.chat/)
 - [Amp](https://ampcode.com) (Sourcegraph)
+- [Auggie](https://www.augmentcode.com/) (Augment Code)
 - Codex CLI (OpenAI)
 - [Qwen Code](https://www.alibabacloud.com/en/solutions/generative-ai/qwen) (Alibaba)
 - [Gemini Code Assist](https://codeassist.google/) (Google)
