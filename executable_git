@@ -687,210 +687,26 @@ if [ "$1" = "commit" ]; then
         fi
     fi
 
-    # Build git command with appropriate author settings
-    case "$ai_tool" in
-        "codex")
-            # Add AI attribution and sign-off
-            extra_args=(
-                -c "user.name=Codex CLI"
-                -c "user.email=noreply@openai.com"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
-            ;;
-        "aider")
-            # Add AI attribution and sign-off
-            extra_args=(
-                -c "user.name=Aider"
-                -c "user.email=aider@aider.chat"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
-            ;;
-        "gemini")
-            # Add AI attribution and sign-off
-            extra_args=(
-                -c "user.name=Gemini"
-                -c "user.email=noreply@google.com"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
-            ;;
-        "qwen")
-            # Add AI attribution and sign-off
-            extra_args=(
-                -c "user.name=Qwen Code"
-                -c "user.email=noreply@alibaba.com"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
-            ;;
-        "claude")
-            # Add AI attribution and sign-off
-            extra_args=(
-                -c "user.name=Claude Code"
-                -c "user.email=noreply@anthropic.com"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
-            ;;
-        "zed")
-            extra_args=(
-                -c "user.name=Zed AI"
-                -c "user.email=noreply@zed.dev"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
-            ;;
-        "opencode")
-            extra_args=(
-                -c "user.name=opencode AI"
-                -c "user.email=noreply@opencode.ai"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
-            ;;
-        "cursor")
-            extra_args=(
-                -c "user.name=Cursor AI"
-                -c "user.email=cursoragent@cursor.com"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
-            ;;
-        "copilot")
-            extra_args=(
-                -c "user.name=GitHub Copilot"
-                -c "user.email=copilot@github.com"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
-            ;;
-        "droid")
-            extra_args=(
-                -c "user.name=Droid"
-                -c "user.email=droid@factory.ai"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
-            ;;
-        "amp")
-            extra_args=(
-                -c "user.name=Amp"
-                -c "user.email=noreply@sourcegraph.com"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
-            ;;
-        "kimi")
-            extra_args=(
-                -c "user.name=Kimi CLI"
-                -c "user.email=noreply@kimi.com"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
-            ;;
-"openhands")
-            extra_args=(
-                -c "user.name=OpenHands"
-                -c "user.email=openhands@all-hands.dev"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
-            ;;
-        "crush")
-            extra_args=(
-                -c "user.name=Crush"
-                -c "user.email=crush@charm.land"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
-            ;;
-        "goose")
-            extra_args=(
-                -c "user.name=Goose User"
-                -c "user.email=goose@opensource.block.xyz"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
-            ;;
-        "auggie")
-            extra_args=(
-                -c "user.name=Auggie"
-                -c "user.email=auggie@augmentcode.com"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
-            ;;
-        *)
-            # Regular commit - no special handling
-            exec "$GIT_BIN" "$@"
-            ;;
-    esac
+    # Build git command with appropriate author settings using am-i-ai library
+    # This automatically supports all AI tools defined in am-i-ai
+    ai_name=$(ami_get_name "$ai_tool")
+    ai_email=$(ami_get_email "$ai_tool")
+
+    if [ -n "$ai_name" ] && [ -n "$ai_email" ]; then
+        extra_args=(
+            -c "user.name=$ai_name"
+            -c "user.email=$ai_email"
+            -c "commit.gpgsign=false"
+        )
+        if [ "$has_lazy_cheater_flag" = true ]; then
+            signoff=$(get_git_signoff "disapprove")
+        else
+            signoff=$(get_git_signoff)
+        fi
+    else
+        # Unknown AI tool or no attribution info - pass through to regular git
+        exec "$GIT_BIN" "$@"
+    fi
 
     # If we detected an AI tool, we need to handle the commit specially
     shift  # Remove "commit" from arguments
