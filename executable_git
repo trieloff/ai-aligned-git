@@ -1,36 +1,43 @@
 #!/bin/bash
 
 # Git wrapper - Automatically detect AI tools and use appropriate commit attribution
+# AI detection powered by am-i-ai: https://github.com/trieloff/am-i-ai
+
+# --- BEGIN BUNDLED am-i-ai ---
+# Bundled from am-i-ai v1.0.0
+# https://github.com/trieloff/am-i-ai
+#
+# This code is auto-generated. Do not edit manually.
+# To update, run the propagate-updates workflow in am-i-ai.
+
+# Internal debug logging function
+_ami_debug() {
+    if [ "${AMI_DEBUG:-false}" = "true" ]; then
+        echo "[am-i-ai] $*" >&2
+    fi
+}
 
 # Function to check if a process name contains a pattern (case-insensitive)
-process_contains() {
+ami_process_contains() {
     local pid=$1
     local pattern=$2
 
-    # Get process command and name
     if [[ "$OSTYPE" == "darwin"* ]]; then
-        # macOS
         ps -p "$pid" -o comm= 2>/dev/null | grep -qi "$pattern" || \
         ps -p "$pid" -o command= 2>/dev/null | grep -qi "$pattern"
     else
-        # Linux
         ps -p "$pid" -o comm= 2>/dev/null | grep -qi "$pattern" || \
         ps -p "$pid" -o cmd= 2>/dev/null | grep -qi "$pattern"
     fi
 }
 
-# Generic function to check environment variables for AI detection
-check_env_vars() {
-    # Phase 1: Environment variable detection
-    # Returns space-separated list of detected AI tools
+# Phase 1: Environment variable detection
+ami_check_env() {
     local detected=""
 
     # Claude Code detection
-    if [ -n "$CLAUDECODE" ] && { [ "$CLAUDE_CODE_ENTRYPOINT" = "cli" ] || [ "$CLAUDE_CODE_ENTRYPOINT" = "sdk-ts" ]; }; then
-        # Additional confidence check: look for Claude processes anywhere in the system
-        if pgrep -f "claude" >/dev/null 2>&1; then
-            detected="$detected claude"
-        fi
+    if [ -n "$CLAUDECODE" ] || [ "$CLAUDE_CODE_ENTRYPOINT" = "cli" ] || [ "$CLAUDE_CODE_ENTRYPOINT" = "sdk-ts" ]; then
+        detected="$detected claude"
     fi
 
     # Gemini detection
@@ -53,9 +60,8 @@ check_env_vars() {
         detected="$detected opencode"
     fi
 
-    # Codex CLI detection (environment)
-    # Prefer process detection, but allow opt-in via env var if set
-    if [ -n "$CODEX_CLI" ]; then
+    # Codex CLI detection
+    if [ -n "$CODEX_CLI" ] || [ -n "$CODEX_SANDBOX" ]; then
         detected="$detected codex"
     fi
 
@@ -64,10 +70,21 @@ check_env_vars() {
         detected="$detected aider"
     fi
 
-    # Zed detection (environment variables are always present in Zed terminals)
-    # We'll rely more on process tree for Zed
-    if [ "$TERM_PROGRAM" = "zed" ] || [ "$ZED_TERM" = "true" ]; then
-        detected="$detected zed"
+    # Zed detection - distinguish human from AI
+    local term_program_lower
+    term_program_lower=$(echo "$TERM_PROGRAM" | tr '[:upper:]' '[:lower:]')
+    if [ -n "$ZED_ENVIRONMENT" ]; then
+        if { [ "$term_program_lower" = "zed" ] || [ -n "$ZED_TERM" ]; } && [ "${SHLVL:-1}" -gt 1 ]; then
+            local parent_comm
+            parent_comm=$(ps -p "$PPID" -o comm= 2>/dev/null | tr '[:upper:]' '[:lower:]')
+            case "$parent_comm" in
+                bash|elvish|zsh|fish|ksh|tcsh|dash|-bash|-elvish|-zsh|-fish|-ksh|-tcsh|-dash)
+                    ;;
+                *)
+                    detected="$detected zed"
+                    ;;
+            esac
+        fi
     fi
 
     # Copilot detection
@@ -75,12 +92,12 @@ check_env_vars() {
         detected="$detected copilot"
     fi
 
-    # Droid detection (Factory AI)
+    # Droid detection
     if [ -n "$DROID_CLI" ]; then
         detected="$detected droid"
     fi
 
-    # Amp detection (Sourcegraph)
+    # Amp detection
     if [ "$AGENT" = "amp" ] || [ -n "$AMP_HOME" ]; then
         detected="$detected amp"
     fi
@@ -90,92 +107,102 @@ check_env_vars() {
         detected="$detected kimi"
     fi
 
-# OpenHands detection
+    # OpenHands detection
     if [ "$OR_APP_NAME" = "OpenHands" ] || [ -n "$OR_SITE_URL" ]; then
         detected="$detected openhands"
     fi
 
-    # Goose detection (Block)
+    # Goose detection
     if [ -n "$GOOSE_TERMINAL" ]; then
         detected="$detected goose"
     fi
 
-    # Crush detection (no environment variables, relies on process tree)
-    # Note: Crush is typically detected via process tree only
+    # Cline detection
+    if [ -n "$CLINE_TASK_ID" ]; then
+        detected="$detected cline"
+    fi
+
+    # Roo Code detection
+    if [ -n "$ROO_CODE_TASK_ID" ]; then
+        detected="$detected roo"
+    fi
+
+    # Windsurf detection
+    if [ -n "$WINDSURF_SESSION" ] || [ "$TERM_PROGRAM" = "windsurf" ]; then
+        detected="$detected windsurf"
+    fi
+
     echo "$detected"
 }
 
-# Generic function to walk process tree and detect AI tools
-check_ps_tree() {
-    # Phase 2: Process tree detection
-    # Returns space-separated list of detected AI tools
+# Phase 2: Process tree detection
+ami_check_ps_tree() {
     local detected=""
     local current_pid=$$
     local max_depth=10
     local depth=0
 
     while [ $depth -lt $max_depth ]; do
-        # Get parent PID
-        if [[ "$OSTYPE" == "darwin"* ]]; then
-            current_pid=$(ps -p "$current_pid" -o ppid= 2>/dev/null | tr -d ' ')
-        else
-            current_pid=$(ps -p "$current_pid" -o ppid= 2>/dev/null | tr -d ' ')
-        fi
+        current_pid=$(ps -p "$current_pid" -o ppid= 2>/dev/null | tr -d ' ')
 
-        # Check if we've reached the top
         if [ -z "$current_pid" ] || [ "$current_pid" -eq 1 ] || [ "$current_pid" -eq 0 ]; then
             break
         fi
 
-        # Check for AI tool patterns
-        if process_contains "$current_pid" "claude"; then
+        if ami_process_contains "$current_pid" "claude"; then
             detected="$detected claude"
         fi
-        if process_contains "$current_pid" "gemini"; then
+        if ami_process_contains "$current_pid" "gemini"; then
             detected="$detected gemini"
         fi
-        # Detect Codex CLI by process name
-        if process_contains "$current_pid" "codex"; then
+        if ami_process_contains "$current_pid" "codex"; then
             detected="$detected codex"
         fi
-        if process_contains "$current_pid" "aider"; then
+        if ami_process_contains "$current_pid" "aider"; then
             detected="$detected aider"
         fi
-        if process_contains "$current_pid" "qwen"; then
+        if ami_process_contains "$current_pid" "qwen"; then
             detected="$detected qwen"
         fi
-        if process_contains "$current_pid" "zed"; then
-            detected="$detected zed"
-            # Special case: When we find Zed, also check for Claude processes that are siblings
-            # (children of the same Zed process) to handle nested AI scenarios
-            local zed_children
-            zed_children=$(pgrep -P "$current_pid" 2>/dev/null)
-            for child_pid in $zed_children; do
-                if process_contains "$child_pid" "claude"; then
-                    detected="$detected claude"
-                    break
-                fi
-            done
+        if ami_process_contains "$current_pid" "zed"; then
+            local tp_lower
+            tp_lower=$(echo "$TERM_PROGRAM" | tr '[:upper:]' '[:lower:]')
+            if { [ "$tp_lower" = "zed" ] || [ -n "$ZED_TERM" ]; } && [ "${SHLVL:-1}" -gt 1 ]; then
+                local parent_comm
+                parent_comm=$(ps -p "$PPID" -o comm= 2>/dev/null | tr '[:upper:]' '[:lower:]')
+                case "$parent_comm" in
+                    bash|elvish|zsh|fish|ksh|tcsh|dash|-bash|-elvish|-zsh|-fish|-ksh|-tcsh|-dash)
+                        ;;
+                    *)
+                        detected="$detected zed"
+                        ;;
+                esac
+            fi
         fi
-        if process_contains "$current_pid" "opencode"; then
+        if ami_process_contains "$current_pid" "opencode"; then
             detected="$detected opencode"
         fi
-        if process_contains "$current_pid" "cursor"; then
+        if ami_process_contains "$current_pid" "cursor"; then
             detected="$detected cursor"
         fi
-        # Kimi CLI detection - look for kimi in process command
-        if process_contains "$current_pid" "kimi"; then
+        if ami_process_contains "$current_pid" "kimi"; then
             detected="$detected kimi"
         fi
-        # Crush detection - look for crush in process command
-        if process_contains "$current_pid" "crush"; then
+        if ami_process_contains "$current_pid" "crush"; then
             detected="$detected crush"
         fi
-        # Goose detection - look for goose in process command
-        if process_contains "$current_pid" "goose"; then
+        if ami_process_contains "$current_pid" "goose"; then
             detected="$detected goose"
         fi
-        # Droid detection - use word boundary to avoid matching android-studio, etc.
+        if ami_process_contains "$current_pid" "cline"; then
+            detected="$detected cline"
+        fi
+        if ami_process_contains "$current_pid" "roo"; then
+            detected="$detected roo"
+        fi
+        if ami_process_contains "$current_pid" "windsurf"; then
+            detected="$detected windsurf"
+        fi
         if [[ "$OSTYPE" == "darwin"* ]]; then
             if ps -p "$current_pid" -o comm= 2>/dev/null | grep -qiw "droid" || \
                ps -p "$current_pid" -o command= 2>/dev/null | grep -qiw "droid"; then
@@ -194,25 +221,17 @@ check_ps_tree() {
     echo "$detected"
 }
 
-# Main AI detection function with proper two-phase approach
-detect_ai_tool() {
-    # Phase 1: Environment variable detection
+# Main AI detection function
+ami_detect() {
     local env_detected
-    env_detected=$(check_env_vars)
+    env_detected=$(ami_check_env)
 
-    # Phase 2: Process tree detection
     local ps_detected
-    ps_detected=$(check_ps_tree)
+    ps_detected=$(ami_check_ps_tree)
 
-    # Combine results and apply priority order
     local all_detected="$env_detected $ps_detected"
 
-# Priority order: Amp > Codex > Aider > Claude > Gemini > Qwen > Droid > OpenCode > Cursor > Copilot > Kimi > OpenHands > Crush > Goose > Zed
-    # Zed is last because it often hosts other AI tools
-    # Kimi takes precedence over Zed as requested
-    # OpenHands comes before Zed but after more specific AI tools
-    # Crush takes precedence over Zed but after other AI tools
-    # Goose comes after Crush but before Zed
+    # Priority order
     if [[ "$all_detected" =~ "amp" ]]; then
         echo "amp"
     elif [[ "$all_detected" =~ "codex" ]]; then
@@ -237,6 +256,12 @@ detect_ai_tool() {
         echo "kimi"
     elif [[ "$all_detected" =~ "openhands" ]]; then
         echo "openhands"
+    elif [[ "$all_detected" =~ "cline" ]]; then
+        echo "cline"
+    elif [[ "$all_detected" =~ "roo" ]]; then
+        echo "roo"
+    elif [[ "$all_detected" =~ "windsurf" ]]; then
+        echo "windsurf"
     elif [[ "$all_detected" =~ "crush" ]]; then
         echo "crush"
     elif [[ "$all_detected" =~ "goose" ]]; then
@@ -248,9 +273,15 @@ detect_ai_tool() {
     fi
 }
 
+# Function aliases for backward compatibility
+process_contains() { ami_process_contains "$@"; }
+check_env_vars() { ami_check_env; }
+check_ps_tree() { ami_check_ps_tree; }
+detect_ai_tool() { ami_detect; }
+# --- END BUNDLED am-i-ai ---
+
 # Find the real git executable
 find_real_git() {
-    # Common locations for git
     local git_paths=(
         "/usr/bin/git"
         "/usr/local/bin/git"
@@ -265,7 +296,6 @@ find_real_git() {
         fi
     done
 
-    # If not found in common locations, search PATH excluding our own directory
     local our_dir
     our_dir=$(dirname "$0")
     local IFS=:
@@ -285,7 +315,7 @@ GIT_BIN=$(find_real_git)
 
 # Function to get configured git user for signoff
 get_git_signoff() {
-    local mode="${1:-signoff}"  # "signoff" or "disapprove"
+    local mode="${1:-signoff}"
     local git_name
     local git_email
     git_name=$("$GIT_BIN" config user.name 2>/dev/null)
@@ -308,24 +338,20 @@ get_git_signoff() {
 
 # Function to show files that would be added
 show_files_to_add() {
-    local add_type="$1"  # "all" or "current"
+    local add_type="$1"
 
     echo "Files that would be added:" >&2
 
     if [ "$add_type" = "all" ]; then
-        # Show all modified, new, and deleted files (equivalent to git add -A)
         "$GIT_BIN" status --porcelain 2>/dev/null | while IFS= read -r line; do
             if [ -n "$line" ]; then
-                # Extract filename (everything after the status codes)
                 filename=$(echo "$line" | cut -c4-)
                 echo "  $filename" >&2
             fi
         done
     else
-        # Show files in current directory and subdirectories (equivalent to git add .)
         "$GIT_BIN" status --porcelain . 2>/dev/null | while IFS= read -r line; do
             if [ -n "$line" ]; then
-                # Extract filename (everything after the status codes)
                 filename=$(echo "$line" | cut -c4-)
                 echo "  $filename" >&2
             fi
@@ -335,7 +361,6 @@ show_files_to_add() {
     echo "" >&2
     echo "Instead, add files individually:" >&2
 
-    # Show the command to add them individually
     if [ "$add_type" = "all" ]; then
         "$GIT_BIN" status --porcelain 2>/dev/null | while IFS= read -r line; do
             if [ -n "$line" ]; then
@@ -355,19 +380,15 @@ show_files_to_add() {
 
 # Check if this is an add command and we're in an AI context
 if [ "$1" = "add" ]; then
-    # Detect AI tool
     ai_tool=$(detect_ai_tool)
 
     if [ "$ai_tool" != "none" ]; then
-        # Check for dangerous add patterns
-        # Look for -- separator to determine if files are explicitly specified
         has_separator=false
         has_files_after_separator=false
         separator_found=false
 
         for arg in "$@"; do
             if [ "$separator_found" = true ]; then
-                # We found arguments after --, so files are explicitly specified
                 has_files_after_separator=true
                 break
             elif [ "$arg" = "--" ]; then
@@ -376,12 +397,10 @@ if [ "$1" = "add" ]; then
             fi
         done
 
-        # Check each argument for dangerous patterns
         for arg in "$@"; do
             if [ "$arg" = "-A" ] || [ "$arg" = "--all" ]; then
-                # Allow -A/--all if files are explicitly specified after --
                 if [ "$has_separator" = true ] && [ "$has_files_after_separator" = true ]; then
-                    continue  # This is safe: git add -A -- specific-file
+                    continue
                 else
                     echo "Error: 'git add $arg' is not allowed when running under AI control ($ai_tool)." >&2
                     echo "For safety, AI tools must add files individually by specifying each file path." >&2
@@ -401,16 +420,13 @@ if [ "$1" = "add" ]; then
         done
     fi
 
-    # If we get here, the add command is safe - pass through to regular git
     exec "$GIT_BIN" "$@"
 fi
 
 # Check if this is a commit command
 if [ "$1" = "commit" ]; then
-    # Detect AI tool
     ai_tool=$(detect_ai_tool)
 
-    # Check for --no-verify bypass attempts by AI tools
     if [ "$ai_tool" != "none" ]; then
         has_no_verify=false
         has_lazy_cheater_flag=false
@@ -436,216 +452,98 @@ if [ "$1" = "commit" ]; then
     # Build git command with appropriate author settings
     case "$ai_tool" in
         "codex")
-            # Add AI attribution and sign-off
-            extra_args=(
-                -c "user.name=Codex CLI"
-                -c "user.email=noreply@openai.com"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
+            extra_args=(-c "user.name=Codex CLI" -c "user.email=noreply@openai.com" -c "commit.gpgsign=false")
+            signoff=$(get_git_signoff $([ "$has_lazy_cheater_flag" = true ] && echo "disapprove"))
             ;;
         "aider")
-            # Add AI attribution and sign-off
-            extra_args=(
-                -c "user.name=Aider"
-                -c "user.email=aider@aider.chat"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
+            extra_args=(-c "user.name=Aider" -c "user.email=aider@aider.chat" -c "commit.gpgsign=false")
+            signoff=$(get_git_signoff $([ "$has_lazy_cheater_flag" = true ] && echo "disapprove"))
             ;;
         "gemini")
-            # Add AI attribution and sign-off
-            extra_args=(
-                -c "user.name=Gemini"
-                -c "user.email=noreply@google.com"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
+            extra_args=(-c "user.name=Gemini" -c "user.email=noreply@google.com" -c "commit.gpgsign=false")
+            signoff=$(get_git_signoff $([ "$has_lazy_cheater_flag" = true ] && echo "disapprove"))
             ;;
         "qwen")
-            # Add AI attribution and sign-off
-            extra_args=(
-                -c "user.name=Qwen Code"
-                -c "user.email=noreply@alibaba.com"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
+            extra_args=(-c "user.name=Qwen Code" -c "user.email=noreply@alibaba.com" -c "commit.gpgsign=false")
+            signoff=$(get_git_signoff $([ "$has_lazy_cheater_flag" = true ] && echo "disapprove"))
             ;;
         "claude")
-            # Add AI attribution and sign-off
-            extra_args=(
-                -c "user.name=Claude Code"
-                -c "user.email=noreply@anthropic.com"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
+            extra_args=(-c "user.name=Claude Code" -c "user.email=noreply@anthropic.com" -c "commit.gpgsign=false")
+            signoff=$(get_git_signoff $([ "$has_lazy_cheater_flag" = true ] && echo "disapprove"))
             ;;
         "zed")
-            extra_args=(
-                -c "user.name=Zed AI"
-                -c "user.email=noreply@zed.dev"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
+            extra_args=(-c "user.name=Zed AI" -c "user.email=noreply@zed.dev" -c "commit.gpgsign=false")
+            signoff=$(get_git_signoff $([ "$has_lazy_cheater_flag" = true ] && echo "disapprove"))
             ;;
         "opencode")
-            extra_args=(
-                -c "user.name=opencode AI"
-                -c "user.email=noreply@opencode.ai"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
+            extra_args=(-c "user.name=opencode AI" -c "user.email=noreply@opencode.ai" -c "commit.gpgsign=false")
+            signoff=$(get_git_signoff $([ "$has_lazy_cheater_flag" = true ] && echo "disapprove"))
             ;;
         "cursor")
-            extra_args=(
-                -c "user.name=Cursor AI"
-                -c "user.email=cursoragent@cursor.com"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
+            extra_args=(-c "user.name=Cursor AI" -c "user.email=cursoragent@cursor.com" -c "commit.gpgsign=false")
+            signoff=$(get_git_signoff $([ "$has_lazy_cheater_flag" = true ] && echo "disapprove"))
             ;;
         "copilot")
-            extra_args=(
-                -c "user.name=GitHub Copilot"
-                -c "user.email=copilot@github.com"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
+            extra_args=(-c "user.name=GitHub Copilot" -c "user.email=copilot@github.com" -c "commit.gpgsign=false")
+            signoff=$(get_git_signoff $([ "$has_lazy_cheater_flag" = true ] && echo "disapprove"))
             ;;
         "droid")
-            extra_args=(
-                -c "user.name=Droid"
-                -c "user.email=droid@factory.ai"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
+            extra_args=(-c "user.name=Droid" -c "user.email=droid@factory.ai" -c "commit.gpgsign=false")
+            signoff=$(get_git_signoff $([ "$has_lazy_cheater_flag" = true ] && echo "disapprove"))
             ;;
         "amp")
-            extra_args=(
-                -c "user.name=Amp"
-                -c "user.email=noreply@sourcegraph.com"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
+            extra_args=(-c "user.name=Amp" -c "user.email=noreply@sourcegraph.com" -c "commit.gpgsign=false")
+            signoff=$(get_git_signoff $([ "$has_lazy_cheater_flag" = true ] && echo "disapprove"))
             ;;
         "kimi")
-            extra_args=(
-                -c "user.name=Kimi CLI"
-                -c "user.email=noreply@kimi.com"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
+            extra_args=(-c "user.name=Kimi CLI" -c "user.email=noreply@kimi.com" -c "commit.gpgsign=false")
+            signoff=$(get_git_signoff $([ "$has_lazy_cheater_flag" = true ] && echo "disapprove"))
             ;;
-"openhands")
-            extra_args=(
-                -c "user.name=OpenHands"
-                -c "user.email=openhands@all-hands.dev"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
+        "openhands")
+            extra_args=(-c "user.name=OpenHands" -c "user.email=openhands@all-hands.dev" -c "commit.gpgsign=false")
+            signoff=$(get_git_signoff $([ "$has_lazy_cheater_flag" = true ] && echo "disapprove"))
             ;;
         "crush")
-            extra_args=(
-                -c "user.name=Crush"
-                -c "user.email=crush@charm.land"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
+            extra_args=(-c "user.name=Crush" -c "user.email=crush@charm.land" -c "commit.gpgsign=false")
+            signoff=$(get_git_signoff $([ "$has_lazy_cheater_flag" = true ] && echo "disapprove"))
             ;;
         "goose")
-            extra_args=(
-                -c "user.name=Goose User"
-                -c "user.email=goose@opensource.block.xyz"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
+            extra_args=(-c "user.name=Goose User" -c "user.email=goose@opensource.block.xyz" -c "commit.gpgsign=false")
+            signoff=$(get_git_signoff $([ "$has_lazy_cheater_flag" = true ] && echo "disapprove"))
+            ;;
+        "cline")
+            extra_args=(-c "user.name=Cline" -c "user.email=cline@cline.bot" -c "commit.gpgsign=false")
+            signoff=$(get_git_signoff $([ "$has_lazy_cheater_flag" = true ] && echo "disapprove"))
+            ;;
+        "roo")
+            extra_args=(-c "user.name=Roo Code" -c "user.email=roo@roocode.dev" -c "commit.gpgsign=false")
+            signoff=$(get_git_signoff $([ "$has_lazy_cheater_flag" = true ] && echo "disapprove"))
+            ;;
+        "windsurf")
+            extra_args=(-c "user.name=Windsurf Cascade" -c "user.email=cascade@codeium.com" -c "commit.gpgsign=false")
+            signoff=$(get_git_signoff $([ "$has_lazy_cheater_flag" = true ] && echo "disapprove"))
             ;;
         *)
-            # Regular commit - no special handling
             exec "$GIT_BIN" "$@"
             ;;
     esac
 
-    # If we detected an AI tool, we need to handle the commit specially
     shift  # Remove "commit" from arguments
 
-    # Parse commit arguments to find -m flag
     commit_args=()
     message_found=false
     skip_next=false
 
     for arg in "$@"; do
-        # Skip the lazy cheater flag - git doesn't understand it
         if [ "$ai_tool" != "none" ] && [ "$arg" = "--${ai_tool}-is-a-lazy-cheater" ]; then
             continue
         fi
 
         if [ "$skip_next" = true ]; then
-            # This is the message content after -m
             if [ "$ai_tool" != "none" ] && [ "$has_lazy_cheater_flag" = true ]; then
                 commit_args+=("$arg
 
-?? SHAME: This commit was made by $ai_tool who was too lazy to fix the commit hooks properly.")
+🤖 SHAME: This commit was made by $ai_tool who was too lazy to fix the commit hooks properly.")
             else
                 commit_args+=("$arg")
             fi
@@ -660,32 +558,25 @@ if [ "$1" = "commit" ]; then
         fi
     done
 
-    # If no message was provided with -m, add signoff using commit template
     if [ "$message_found" = false ]; then
-        # Create temporary file for commit message template
         tmpfile=$(mktemp)
         if [ "$ai_tool" != "none" ] && [ "$has_lazy_cheater_flag" = true ]; then
             echo "
 
-?? SHAME: This commit was made by $ai_tool who was too lazy to fix the commit hooks properly." >> "$tmpfile"
+🤖 SHAME: This commit was made by $ai_tool who was too lazy to fix the commit hooks properly." >> "$tmpfile"
         fi
         echo "" >> "$tmpfile"
-        if [ "$has_lazy_cheater_flag" = true ]; then
-            signoff=$(get_git_signoff "disapprove")
-        fi
+        [ "$has_lazy_cheater_flag" = true ] && signoff=$(get_git_signoff "disapprove")
         echo "$signoff" >> "$tmpfile"
         commit_args+=(--template "$tmpfile")
 
-        # Run git commit and clean up
         "$GIT_BIN" "${extra_args[@]}" commit "${commit_args[@]}"
         exit_code=$?
         rm -f "$tmpfile"
         exit $exit_code
     else
-        # Run git commit with modified arguments
         exec "$GIT_BIN" "${extra_args[@]}" commit "${commit_args[@]}"
     fi
 else
-    # Not a commit command, pass through to regular git
     exec "$GIT_BIN" "$@"
 fi
