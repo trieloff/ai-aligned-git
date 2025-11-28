@@ -26,11 +26,11 @@ check_env_vars() {
     local detected=""
 
     # Claude Code detection
+    # Detect via CLAUDECODE + CLAUDE_CODE_ENTRYPOINT env vars
+    # Note: pgrep check removed as it fails in sandboxed environments (e.g., Codex seatbelt)
+    # The env vars alone are sufficient for reliable detection
     if [ -n "$CLAUDECODE" ] && { [ "$CLAUDE_CODE_ENTRYPOINT" = "cli" ] || [ "$CLAUDE_CODE_ENTRYPOINT" = "sdk-ts" ]; }; then
-        # Additional confidence check: look for Claude processes anywhere in the system
-        if pgrep -f "claude" >/dev/null 2>&1; then
-            detected="$detected claude"
-        fi
+        detected="$detected claude"
     fi
 
     # Gemini detection
@@ -54,8 +54,8 @@ check_env_vars() {
     fi
 
     # Codex CLI detection (environment)
-    # Prefer process detection, but allow opt-in via env var if set
-    if [ -n "$CODEX_CLI" ]; then
+    # Detect via CODEX_CLI env var or CODEX_SANDBOX (set in sandboxed ACP sessions)
+    if [ -n "$CODEX_CLI" ] || [ -n "$CODEX_SANDBOX" ]; then
         detected="$detected codex"
     fi
 
@@ -64,10 +64,26 @@ check_env_vars() {
         detected="$detected aider"
     fi
 
-    # Zed detection (environment variables are always present in Zed terminals)
-    # We'll rely more on process tree for Zed
-    if [ "$TERM_PROGRAM" = "zed" ] || [ "$ZED_TERM" = "true" ]; then
-        detected="$detected zed"
+    # Zed detection - three modes:
+    # 1. Human via git panel/terminal: TERM_PROGRAM=zed + ZED_TERM + ZED_ENVIRONMENT
+    # 2. Zed's native agent: ZED_ENVIRONMENT set WITHOUT terminal vars
+    # 3. ACP integrations: Have their own tool markers (handled above)
+    #
+    # We only want to attribute to "zed" (Zed's native agent) when:
+    # - ZED_ENVIRONMENT is set (any value, not just worktree-shell) AND
+    # - Terminal vars (TERM_PROGRAM=zed, ZED_TERM) are NOT set
+    # Human usage (with terminal vars) should NOT be attributed to AI
+    #
+    # Use case-insensitive check for TERM_PROGRAM and presence check for ZED_TERM
+    # to handle variations like "Zed", "ZED", ZED_TERM="1", ZED_TERM="True", etc.
+    local term_program_lower
+    term_program_lower=$(echo "$TERM_PROGRAM" | tr '[:upper:]' '[:lower:]')
+    if [ -n "$ZED_ENVIRONMENT" ]; then
+        if [ "$term_program_lower" != "zed" ] && [ -z "$ZED_TERM" ]; then
+            # Zed's native agent - no terminal environment
+            detected="$detected zed"
+        fi
+        # else: Human via git panel/terminal - don't attribute to AI
     fi
 
     # Copilot detection
@@ -150,7 +166,14 @@ check_ps_tree() {
             detected="$detected qwen"
         fi
         if process_contains "$current_pid" "zed"; then
-            detected="$detected zed"
+            # Only attribute to Zed's native agent if NOT in a terminal environment
+            # (Human usage via git panel/terminal has TERM_PROGRAM=zed and ZED_TERM set)
+            # Use case-insensitive check for TERM_PROGRAM and presence check for ZED_TERM
+            local tp_lower
+            tp_lower=$(echo "$TERM_PROGRAM" | tr '[:upper:]' '[:lower:]')
+            if [ "$tp_lower" != "zed" ] && [ -z "$ZED_TERM" ]; then
+                detected="$detected zed"
+            fi
             # Special case: When we find Zed, also check for Claude processes that are siblings
             # (children of the same Zed process) to handle nested AI scenarios
             local zed_children
