@@ -179,16 +179,9 @@ check_ps_tree() {
             if [ "$tp_lower" != "zed" ] && [ -z "$ZED_TERM" ] && [ "${SHLVL:-1}" -gt 1 ]; then
                 detected="$detected zed"
             fi
-            # Special case: When we find Zed, also check for Claude processes that are siblings
-            # (children of the same Zed process) to handle nested AI scenarios
-            local zed_children
-            zed_children=$(pgrep -P "$current_pid" 2>/dev/null)
-            for child_pid in $zed_children; do
-                if process_contains "$child_pid" "claude"; then
-                    detected="$detected claude"
-                    break
-                fi
-            done
+            # Note: We intentionally do NOT check for sibling AI processes here.
+            # Just because another AI (e.g., Claude) is running as a sibling doesn't
+            # mean it initiated this git command - Zed's agent did.
         fi
         if process_contains "$current_pid" "opencode"; then
             detected="$detected opencode"
