@@ -66,25 +66,31 @@ check_env_vars() {
 
     # Zed detection - observed patterns:
     # 1. Human via git panel: ZED_ENVIRONMENT + NO terminal vars + SHLVL=1
-    # 2. Zed's native agent: ZED_ENVIRONMENT + HAS terminal vars + SHLVL>1
-    # 3. ACP integrations: Have their own tool markers (handled above)
+    # 2. Human via terminal: ZED_ENVIRONMENT + parent is interactive shell (elvish, zsh, bash, fish)
+    # 3. Zed's native agent: ZED_ENVIRONMENT + HAS terminal vars + SHLVL>1 + parent NOT interactive shell
+    # 4. ACP integrations: Have their own tool markers (handled above)
     #
-    # Key insight from testing:
-    # - Human git panel: Zed spawns git directly (SHLVL=1, no TERM_PROGRAM/ZED_TERM)
-    # - Zed agent: Runs through shell context (SHLVL=3, has TERM_PROGRAM=zed, ZED_TERM=true)
-    #
-    # We attribute to "zed" (Zed's native agent) when:
-    # - ZED_ENVIRONMENT is set AND
-    # - Terminal vars (TERM_PROGRAM=zed or ZED_TERM) ARE set AND
-    # - SHLVL > 1 (running through shell/agent context)
+    # Key insight: If the direct parent process is an interactive shell,
+    # the user is typing commands manually, not the Zed agent.
     local term_program_lower
     term_program_lower=$(echo "$TERM_PROGRAM" | tr '[:upper:]' '[:lower:]')
     if [ -n "$ZED_ENVIRONMENT" ]; then
         if { [ "$term_program_lower" = "zed" ] || [ -n "$ZED_TERM" ]; } && [ "${SHLVL:-1}" -gt 1 ]; then
-            # Zed's native agent - has terminal vars and running through shell
-            detected="$detected zed"
+            # Has terminal vars and SHLVL>1 - could be agent or human in terminal
+            # Check if parent process is an interactive shell (human typing)
+            local parent_comm
+            parent_comm=$(ps -p "$PPID" -o comm= 2>/dev/null | tr '[:upper:]' '[:lower:]')
+            case "$parent_comm" in
+                elvish|zsh|fish|ksh|tcsh|dash|-elvish|-zsh|-bash|-fish|-ksh|-tcsh|-dash)
+                    # Parent is interactive shell - human typing in terminal
+                    ;;
+                *)
+                    # Parent is not an interactive shell - likely Zed agent
+                    detected="$detected zed"
+                    ;;
+            esac
         fi
-        # else: Either human git panel (SHLVL=1, no terminal vars) or edge case
+        # else: Human git panel (SHLVL=1, no terminal vars)
     fi
 
     # Copilot detection
@@ -168,11 +174,20 @@ check_ps_tree() {
         fi
         if process_contains "$current_pid" "zed"; then
             # Attribute to Zed's native agent when terminal vars ARE set and SHLVL > 1
-            # Human git panel has no terminal vars and SHLVL=1
+            # BUT not if parent is an interactive shell (human typing)
             local tp_lower
             tp_lower=$(echo "$TERM_PROGRAM" | tr '[:upper:]' '[:lower:]')
             if { [ "$tp_lower" = "zed" ] || [ -n "$ZED_TERM" ]; } && [ "${SHLVL:-1}" -gt 1 ]; then
-                detected="$detected zed"
+                local parent_comm
+                parent_comm=$(ps -p "$PPID" -o comm= 2>/dev/null | tr '[:upper:]' '[:lower:]')
+                case "$parent_comm" in
+                    elvish|zsh|fish|ksh|tcsh|dash|-elvish|-zsh|-bash|-fish|-ksh|-tcsh|-dash)
+                        # Parent is interactive shell - human typing
+                        ;;
+                    *)
+                        detected="$detected zed"
+                        ;;
+                esac
             fi
         fi
         if process_contains "$current_pid" "opencode"; then
