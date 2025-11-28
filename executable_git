@@ -65,25 +65,31 @@ check_env_vars() {
     fi
 
     # Zed detection - three modes:
-    # 1. Human via git panel/terminal: TERM_PROGRAM=zed + ZED_TERM + ZED_ENVIRONMENT
-    # 2. Zed's native agent: ZED_ENVIRONMENT set WITHOUT terminal vars
-    # 3. ACP integrations: Have their own tool markers (handled above)
+    # 1. Human via git panel: ZED_ENVIRONMENT + SHLVL=1 (direct child of Zed)
+    # 2. Human via terminal: TERM_PROGRAM=zed + ZED_TERM set
+    # 3. Zed's native agent: ZED_ENVIRONMENT + SHLVL>=2 + no terminal vars
+    # 4. ACP integrations: Have their own tool markers (handled above)
+    #
+    # Key insight: Human git panel spawns git directly from Zed (SHLVL=1),
+    # while Zed's agent runs through a shell (SHLVL>=2).
     #
     # We only want to attribute to "zed" (Zed's native agent) when:
-    # - ZED_ENVIRONMENT is set (any value, not just worktree-shell) AND
-    # - Terminal vars (TERM_PROGRAM=zed, ZED_TERM) are NOT set
-    # Human usage (with terminal vars) should NOT be attributed to AI
-    #
-    # Use case-insensitive check for TERM_PROGRAM and presence check for ZED_TERM
-    # to handle variations like "Zed", "ZED", ZED_TERM="1", ZED_TERM="True", etc.
+    # - ZED_ENVIRONMENT is set AND
+    # - Terminal vars (TERM_PROGRAM=zed, ZED_TERM) are NOT set AND
+    # - SHLVL > 1 (not direct child of Zed, i.e., running through shell/agent)
     local term_program_lower
     term_program_lower=$(echo "$TERM_PROGRAM" | tr '[:upper:]' '[:lower:]')
     if [ -n "$ZED_ENVIRONMENT" ]; then
         if [ "$term_program_lower" != "zed" ] && [ -z "$ZED_TERM" ]; then
-            # Zed's native agent - no terminal environment
-            detected="$detected zed"
+            # No terminal vars - could be git panel or agent
+            # Distinguish by SHLVL: 1 = direct from Zed (human), 2+ = through shell (agent)
+            if [ "${SHLVL:-1}" -gt 1 ]; then
+                # Zed's native agent - running through shell
+                detected="$detected zed"
+            fi
+            # else: SHLVL=1 means human via git panel - don't attribute to AI
         fi
-        # else: Human via git panel/terminal - don't attribute to AI
+        # else: Has terminal vars - human via terminal, don't attribute to AI
     fi
 
     # Copilot detection
@@ -167,11 +173,10 @@ check_ps_tree() {
         fi
         if process_contains "$current_pid" "zed"; then
             # Only attribute to Zed's native agent if NOT in a terminal environment
-            # (Human usage via git panel/terminal has TERM_PROGRAM=zed and ZED_TERM set)
-            # Use case-insensitive check for TERM_PROGRAM and presence check for ZED_TERM
+            # and NOT direct child of Zed (human git panel has SHLVL=1)
             local tp_lower
             tp_lower=$(echo "$TERM_PROGRAM" | tr '[:upper:]' '[:lower:]')
-            if [ "$tp_lower" != "zed" ] && [ -z "$ZED_TERM" ]; then
+            if [ "$tp_lower" != "zed" ] && [ -z "$ZED_TERM" ] && [ "${SHLVL:-1}" -gt 1 ]; then
                 detected="$detected zed"
             fi
             # Special case: When we find Zed, also check for Claude processes that are siblings
