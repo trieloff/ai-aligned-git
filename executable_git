@@ -26,10 +26,10 @@ check_env_vars() {
     local detected=""
 
     # Claude Code detection
-    # Detect via CLAUDECODE + CLAUDE_CODE_ENTRYPOINT env vars
-    # Note: pgrep check removed as it fails in sandboxed environments (e.g., Codex seatbelt)
-    # The env vars alone are sufficient for reliable detection
-    if [ -n "$CLAUDECODE" ] && { [ "$CLAUDE_CODE_ENTRYPOINT" = "cli" ] || [ "$CLAUDE_CODE_ENTRYPOINT" = "sdk-ts" ]; }; then
+    # Detect via CLAUDECODE or CLAUDE_CODE_ENTRYPOINT env vars
+    # ACP mode sets CLAUDECODE=1 without CLAUDE_CODE_ENTRYPOINT
+    # CLI/SDK mode sets both CLAUDECODE and CLAUDE_CODE_ENTRYPOINT
+    if [ -n "$CLAUDECODE" ] || [ "$CLAUDE_CODE_ENTRYPOINT" = "cli" ] || [ "$CLAUDE_CODE_ENTRYPOINT" = "sdk-ts" ]; then
         detected="$detected claude"
     fi
 
