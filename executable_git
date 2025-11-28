@@ -64,32 +64,27 @@ check_env_vars() {
         detected="$detected aider"
     fi
 
-    # Zed detection - three modes:
-    # 1. Human via git panel: ZED_ENVIRONMENT + SHLVL=1 (direct child of Zed)
-    # 2. Human via terminal: TERM_PROGRAM=zed + ZED_TERM set
-    # 3. Zed's native agent: ZED_ENVIRONMENT + SHLVL>=2 + no terminal vars
-    # 4. ACP integrations: Have their own tool markers (handled above)
+    # Zed detection - observed patterns:
+    # 1. Human via git panel: ZED_ENVIRONMENT + NO terminal vars + SHLVL=1
+    # 2. Zed's native agent: ZED_ENVIRONMENT + HAS terminal vars + SHLVL>1
+    # 3. ACP integrations: Have their own tool markers (handled above)
     #
-    # Key insight: Human git panel spawns git directly from Zed (SHLVL=1),
-    # while Zed's agent runs through a shell (SHLVL>=2).
+    # Key insight from testing:
+    # - Human git panel: Zed spawns git directly (SHLVL=1, no TERM_PROGRAM/ZED_TERM)
+    # - Zed agent: Runs through shell context (SHLVL=3, has TERM_PROGRAM=zed, ZED_TERM=true)
     #
-    # We only want to attribute to "zed" (Zed's native agent) when:
+    # We attribute to "zed" (Zed's native agent) when:
     # - ZED_ENVIRONMENT is set AND
-    # - Terminal vars (TERM_PROGRAM=zed, ZED_TERM) are NOT set AND
-    # - SHLVL > 1 (not direct child of Zed, i.e., running through shell/agent)
+    # - Terminal vars (TERM_PROGRAM=zed or ZED_TERM) ARE set AND
+    # - SHLVL > 1 (running through shell/agent context)
     local term_program_lower
     term_program_lower=$(echo "$TERM_PROGRAM" | tr '[:upper:]' '[:lower:]')
     if [ -n "$ZED_ENVIRONMENT" ]; then
-        if [ "$term_program_lower" != "zed" ] && [ -z "$ZED_TERM" ]; then
-            # No terminal vars - could be git panel or agent
-            # Distinguish by SHLVL: 1 = direct from Zed (human), 2+ = through shell (agent)
-            if [ "${SHLVL:-1}" -gt 1 ]; then
-                # Zed's native agent - running through shell
-                detected="$detected zed"
-            fi
-            # else: SHLVL=1 means human via git panel - don't attribute to AI
+        if { [ "$term_program_lower" = "zed" ] || [ -n "$ZED_TERM" ]; } && [ "${SHLVL:-1}" -gt 1 ]; then
+            # Zed's native agent - has terminal vars and running through shell
+            detected="$detected zed"
         fi
-        # else: Has terminal vars - human via terminal, don't attribute to AI
+        # else: Either human git panel (SHLVL=1, no terminal vars) or edge case
     fi
 
     # Copilot detection
@@ -172,16 +167,13 @@ check_ps_tree() {
             detected="$detected qwen"
         fi
         if process_contains "$current_pid" "zed"; then
-            # Only attribute to Zed's native agent if NOT in a terminal environment
-            # and NOT direct child of Zed (human git panel has SHLVL=1)
+            # Attribute to Zed's native agent when terminal vars ARE set and SHLVL > 1
+            # Human git panel has no terminal vars and SHLVL=1
             local tp_lower
             tp_lower=$(echo "$TERM_PROGRAM" | tr '[:upper:]' '[:lower:]')
-            if [ "$tp_lower" != "zed" ] && [ -z "$ZED_TERM" ] && [ "${SHLVL:-1}" -gt 1 ]; then
+            if { [ "$tp_lower" = "zed" ] || [ -n "$ZED_TERM" ]; } && [ "${SHLVL:-1}" -gt 1 ]; then
                 detected="$detected zed"
             fi
-            # Note: We intentionally do NOT check for sibling AI processes here.
-            # Just because another AI (e.g., Claude) is running as a sibling doesn't
-            # mean it initiated this git command - Zed's agent did.
         fi
         if process_contains "$current_pid" "opencode"; then
             detected="$detected opencode"
