@@ -6,7 +6,7 @@
 # Extract the ami_check_env function and the check_env_vars alias from executable_git
 eval "$(sed -n '/^_ami_debug()/,/^}/p' executable_git)"
 eval "$(sed -n '/^ami_check_env()/,/^}/p' executable_git)"
-eval "$(sed -n 's/^check_env_vars() { ami_check_env; }$/check_env_vars() { ami_check_env; }/p' executable_git)"
+eval "$(sed -n '/^check_env_vars()/p' executable_git)"
 
 echo "=== Testing Environment Variable Detection Only ==="
 

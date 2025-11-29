@@ -39,7 +39,7 @@ check_env_vars() {
         detected="$detected zed"
     fi
 
-    # Cursor detection - use CURSOR_AGENT to avoid false positives in Cursor IDE terminals
+    # Cursor detection - use CURSOR_AGENT env var (cursor-agent process is checked separately below)
     if [ -n "$CURSOR_AGENT" ]; then
         detected="$detected cursor"
     fi
