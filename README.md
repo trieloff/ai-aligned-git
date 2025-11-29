@@ -216,6 +216,7 @@ The choice is yours. But choose quickly. The AIs are already choosing for you.
 Part of the **[AI Ecoverse](https://github.com/trieloff/ai-ecoverse)** - a comprehensive ecosystem of tools for AI-assisted development:
 
 - **[yolo](https://github.com/trieloff/yolo)** - AI CLI launcher with worktree isolation
+- **[am-i-ai](https://github.com/trieloff/am-i-ai)** - Shared AI detection library (powers this tool)
 - **[ai-aligned-gh](https://github.com/trieloff/ai-aligned-gh)** - GitHub CLI wrapper for proper AI attribution
 - **[vibe-coded-badge-action](https://github.com/trieloff/vibe-coded-badge-action)** - Badge showing AI-generated code percentage
 - **[gh-workflow-peek](https://github.com/trieloff/gh-workflow-peek)** - Smarter GitHub Actions log filtering

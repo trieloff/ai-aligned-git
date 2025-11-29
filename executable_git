@@ -1,9 +1,32 @@
 #!/bin/bash
 
 # Git wrapper - Automatically detect AI tools and use appropriate commit attribution
+# Uses am-i-ai shared detection library
+# See: https://github.com/trieloff/am-i-ai
+
+# --- BEGIN BUNDLED am-i-ai ---
+# Bundled from am-i-ai (https://github.com/trieloff/am-i-ai)
+# This section is automatically updated by the propagate-updates workflow
+
+#   if [ "$AI_TOOL" != "none" ]; then
+
+# Version of the am-i-ai library
+AMI_VERSION="1.0.0"
+
+# Debug mode - set AMI_DEBUG=true to enable
+AMI_DEBUG="${AMI_DEBUG:-false}"
+
+# Internal debug logging function
+_ami_debug() {
+    if [ "$AMI_DEBUG" = "true" ]; then
+        echo "[am-i-ai] $*" >&2
+    fi
+}
 
 # Function to check if a process name contains a pattern (case-insensitive)
-process_contains() {
+# Arguments: $1 = pid, $2 = pattern
+# Returns: 0 if pattern found, 1 otherwise
+ami_process_contains() {
     local pid=$1
     local pattern=$2
 
@@ -19,105 +42,161 @@ process_contains() {
     fi
 }
 
-# Generic function to check environment variables for AI detection
-check_env_vars() {
-    # Phase 1: Environment variable detection
-    # Returns space-separated list of detected AI tools
+# Phase 1: Environment variable detection
+# Returns space-separated list of detected AI tools
+ami_check_env() {
     local detected=""
 
     # Claude Code detection
-    if [ -n "$CLAUDECODE" ] && { [ "$CLAUDE_CODE_ENTRYPOINT" = "cli" ] || [ "$CLAUDE_CODE_ENTRYPOINT" = "sdk-ts" ]; }; then
-        # Additional confidence check: look for Claude processes anywhere in the system
-        if pgrep -f "claude" >/dev/null 2>&1; then
-            detected="$detected claude"
-        fi
+    # Detect via CLAUDECODE or CLAUDE_CODE_ENTRYPOINT env vars
+    # ACP mode sets CLAUDECODE=1 without CLAUDE_CODE_ENTRYPOINT
+    # CLI/SDK mode sets both CLAUDECODE and CLAUDE_CODE_ENTRYPOINT
+    if [ -n "$CLAUDECODE" ] || [ "$CLAUDE_CODE_ENTRYPOINT" = "cli" ] || [ "$CLAUDE_CODE_ENTRYPOINT" = "sdk-ts" ]; then
+        detected="$detected claude"
+        _ami_debug "Detected Claude via environment variable"
     fi
 
     # Gemini detection
     if [ -n "$GEMINI_CLI" ]; then
         detected="$detected gemini"
+        _ami_debug "Detected Gemini via environment variable"
     fi
 
     # Qwen detection
     if [ -n "$QWEN_CODE" ]; then
         detected="$detected qwen"
+        _ami_debug "Detected Qwen via environment variable"
     fi
 
     # Cursor detection
-    if [ -n "$CURSOR_AGENT" ]; then
+    if [ -n "$CURSOR_AI" ]; then
         detected="$detected cursor"
+        _ami_debug "Detected Cursor via environment variable"
     fi
 
     # OpenCode detection
     if [ -n "$OPENCODE_AI" ]; then
         detected="$detected opencode"
+        _ami_debug "Detected OpenCode via environment variable"
     fi
 
-    # Codex CLI detection (environment)
-    # Prefer process detection, but allow opt-in via env var if set
-    if [ -n "$CODEX_CLI" ]; then
+    # Codex CLI detection
+    # Detect via CODEX_CLI env var or CODEX_SANDBOX (set in sandboxed ACP sessions)
+    if [ -n "$CODEX_CLI" ] || [ -n "$CODEX_SANDBOX" ]; then
         detected="$detected codex"
+        _ami_debug "Detected Codex via environment variable"
     fi
 
     # Aider detection
     if [ "$OR_APP_NAME" = "Aider" ]; then
         detected="$detected aider"
+        _ami_debug "Detected Aider via environment variable"
     fi
 
-    # Zed detection (environment variables are always present in Zed terminals)
-    # We'll rely more on process tree for Zed
-    if [ "$TERM_PROGRAM" = "zed" ] || [ "$ZED_TERM" = "true" ]; then
-        detected="$detected zed"
+    # Zed detection - complex logic to distinguish human from AI
+    # Observed patterns:
+    # 1. Human via git panel: ZED_ENVIRONMENT + NO terminal vars + SHLVL=1
+    # 2. Human via terminal: ZED_ENVIRONMENT + parent is interactive shell (elvish, zsh, bash, fish)
+    # 3. Zed's native agent: ZED_ENVIRONMENT + HAS terminal vars + SHLVL>1 + parent NOT interactive shell
+    # 4. ACP integrations: Have their own tool markers (handled above)
+    #
+    # Key insight: If the direct parent process is an interactive shell,
+    # the user is typing commands manually, not the Zed agent.
+    local term_program_lower
+    term_program_lower=$(echo "$TERM_PROGRAM" | tr '[:upper:]' '[:lower:]')
+    if [ -n "$ZED_ENVIRONMENT" ]; then
+        if { [ "$term_program_lower" = "zed" ] || [ -n "$ZED_TERM" ]; } && [ "${SHLVL:-1}" -gt 1 ]; then
+            # Has terminal vars and SHLVL>1 - could be agent or human in terminal
+            # Check if parent process is an interactive shell (human typing)
+            local parent_comm
+            parent_comm=$(ps -p "$PPID" -o comm= 2>/dev/null | tr '[:upper:]' '[:lower:]')
+            case "$parent_comm" in
+                bash|elvish|zsh|fish|ksh|tcsh|dash|-bash|-elvish|-zsh|-fish|-ksh|-tcsh|-dash)
+                    # Parent is interactive shell - human typing in terminal
+                    _ami_debug "Zed detected but parent is interactive shell ($parent_comm) - human typing"
+                    ;;
+                *)
+                    # Parent is not an interactive shell - likely Zed agent
+                    detected="$detected zed"
+                    _ami_debug "Detected Zed AI agent via environment (parent: $parent_comm)"
+                    ;;
+            esac
+        fi
+        # else: Human git panel (SHLVL=1, no terminal vars)
     fi
 
     # Copilot detection
     if [ "$GITHUB_COPILOT_CLI_MODE" = "true" ]; then
         detected="$detected copilot"
+        _ami_debug "Detected Copilot via environment variable"
     fi
 
     # Droid detection (Factory AI)
     if [ -n "$DROID_CLI" ]; then
         detected="$detected droid"
+        _ami_debug "Detected Droid via environment variable"
     fi
 
     # Amp detection (Sourcegraph)
     if [ "$AGENT" = "amp" ] || [ -n "$AMP_HOME" ]; then
         detected="$detected amp"
+        _ami_debug "Detected Amp via environment variable"
     fi
 
     # Kimi CLI detection
     if [ -n "$KIMI_CLI" ]; then
         detected="$detected kimi"
+        _ami_debug "Detected Kimi CLI via environment variable"
     fi
 
-# OpenHands detection
+    # OpenHands detection
     if [ "$OR_APP_NAME" = "OpenHands" ] || [ -n "$OR_SITE_URL" ]; then
         detected="$detected openhands"
+        _ami_debug "Detected OpenHands via environment variable"
     fi
 
     # Goose detection (Block)
     if [ -n "$GOOSE_TERMINAL" ]; then
         detected="$detected goose"
+        _ami_debug "Detected Goose via environment variable"
     fi
 
     # Auggie detection (Augment Code)
     if [ -n "$AUGMENT_API_TOKEN" ]; then
         detected="$detected auggie"
+        _ami_debug "Detected Auggie via environment variable"
     fi
 
-    # Crush detection (no environment variables, relies on process tree)
-    # Note: Crush is typically detected via process tree only
+    # Cline detection (VS Code extension)
+    if [ -n "$CLINE_TASK_ID" ]; then
+        detected="$detected cline"
+        _ami_debug "Detected Cline via environment variable"
+    fi
+
+    # Roo Code detection (VS Code extension)
+    if [ -n "$ROO_CODE_TASK_ID" ]; then
+        detected="$detected roo"
+        _ami_debug "Detected Roo Code via environment variable"
+    fi
+
+    # Windsurf/Cascade detection
+    if [ -n "$WINDSURF_SESSION" ] || [ "$TERM_PROGRAM" = "windsurf" ]; then
+        detected="$detected windsurf"
+        _ami_debug "Detected Windsurf via environment variable"
+    fi
+
     echo "$detected"
 }
 
-# Generic function to walk process tree and detect AI tools
-check_ps_tree() {
-    # Phase 2: Process tree detection
-    # Returns space-separated list of detected AI tools
+# Phase 2: Process tree detection
+# Returns space-separated list of detected AI tools
+ami_check_ps_tree() {
     local detected=""
     local current_pid=$$
     local max_depth=10
     local depth=0
+
+    _ami_debug "Starting process tree detection from PID $current_pid"
 
     while [ $depth -lt $max_depth ]; do
         # Get parent PID
@@ -129,71 +208,118 @@ check_ps_tree() {
 
         # Check if we've reached the top
         if [ -z "$current_pid" ] || [ "$current_pid" -eq 1 ] || [ "$current_pid" -eq 0 ]; then
+            _ami_debug "Reached top of process tree at depth $depth"
             break
         fi
 
+        _ami_debug "Checking PID $current_pid at depth $depth"
+
         # Check for AI tool patterns
-        if process_contains "$current_pid" "claude"; then
+        if ami_process_contains "$current_pid" "claude"; then
             detected="$detected claude"
+            _ami_debug "Detected Claude in process tree at depth $depth"
         fi
-        if process_contains "$current_pid" "gemini"; then
+        if ami_process_contains "$current_pid" "gemini"; then
             detected="$detected gemini"
+            _ami_debug "Detected Gemini in process tree at depth $depth"
         fi
         # Detect Codex CLI by process name
-        if process_contains "$current_pid" "codex"; then
+        if ami_process_contains "$current_pid" "codex"; then
             detected="$detected codex"
+            _ami_debug "Detected Codex in process tree at depth $depth"
         fi
-        if process_contains "$current_pid" "aider"; then
+        if ami_process_contains "$current_pid" "aider"; then
             detected="$detected aider"
+            _ami_debug "Detected Aider in process tree at depth $depth"
         fi
-        if process_contains "$current_pid" "qwen"; then
+        if ami_process_contains "$current_pid" "qwen"; then
             detected="$detected qwen"
+            _ami_debug "Detected Qwen in process tree at depth $depth"
         fi
-        if process_contains "$current_pid" "zed"; then
-            detected="$detected zed"
-            # Special case: When we find Zed, also check for Claude processes that are siblings
-            # (children of the same Zed process) to handle nested AI scenarios
-            local zed_children
-            zed_children=$(pgrep -P "$current_pid" 2>/dev/null)
-            for child_pid in $zed_children; do
-                if process_contains "$child_pid" "claude"; then
-                    detected="$detected claude"
-                    break
-                fi
-            done
+        if ami_process_contains "$current_pid" "zed"; then
+            # Attribute to Zed's native agent when terminal vars ARE set and SHLVL > 1
+            # BUT not if parent is an interactive shell (human typing)
+            local tp_lower
+            tp_lower=$(echo "$TERM_PROGRAM" | tr '[:upper:]' '[:lower:]')
+            if { [ "$tp_lower" = "zed" ] || [ -n "$ZED_TERM" ]; } && [ "${SHLVL:-1}" -gt 1 ]; then
+                local parent_comm
+                parent_comm=$(ps -p "$PPID" -o comm= 2>/dev/null | tr '[:upper:]' '[:lower:]')
+                case "$parent_comm" in
+                    bash|elvish|zsh|fish|ksh|tcsh|dash|-bash|-elvish|-zsh|-fish|-ksh|-tcsh|-dash)
+                        # Parent is interactive shell - human typing
+                        _ami_debug "Zed in tree but parent is interactive shell - human typing"
+                        ;;
+                    *)
+                        detected="$detected zed"
+                        _ami_debug "Detected Zed AI in process tree at depth $depth"
+                        ;;
+                esac
+            fi
         fi
-        if process_contains "$current_pid" "opencode"; then
+        if ami_process_contains "$current_pid" "opencode"; then
             detected="$detected opencode"
+            _ami_debug "Detected OpenCode in process tree at depth $depth"
         fi
-        if process_contains "$current_pid" "cursor-agent"; then
+        if ami_process_contains "$current_pid" "cursor"; then
             detected="$detected cursor"
+            _ami_debug "Detected Cursor in process tree at depth $depth"
         fi
         # Kimi CLI detection - look for kimi in process command
-        if process_contains "$current_pid" "kimi"; then
+        if ami_process_contains "$current_pid" "kimi"; then
             detected="$detected kimi"
+            _ami_debug "Detected Kimi CLI in process tree at depth $depth"
         fi
         # Crush detection - look for crush in process command
-        if process_contains "$current_pid" "crush"; then
+        if ami_process_contains "$current_pid" "crush"; then
             detected="$detected crush"
+            _ami_debug "Detected Crush in process tree at depth $depth"
         fi
         # Goose detection - look for goose in process command
-        if process_contains "$current_pid" "goose"; then
+        if ami_process_contains "$current_pid" "goose"; then
             detected="$detected goose"
+            _ami_debug "Detected Goose in process tree at depth $depth"
         fi
         # Auggie detection - look for auggie in process command
-        if process_contains "$current_pid" "auggie"; then
+        if ami_process_contains "$current_pid" "auggie"; then
             detected="$detected auggie"
+            _ami_debug "Detected Auggie in process tree at depth $depth"
+        fi
+        # Cline detection
+        if ami_process_contains "$current_pid" "cline"; then
+            detected="$detected cline"
+            _ami_debug "Detected Cline in process tree at depth $depth"
+        fi
+        # Roo Code detection - use word boundary to avoid matching "kangaroo", etc.
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            if ps -p "$current_pid" -o comm= 2>/dev/null | grep -qiw "roo" || \
+               ps -p "$current_pid" -o command= 2>/dev/null | grep -qiw "roo"; then
+                detected="$detected roo"
+                _ami_debug "Detected Roo Code in process tree at depth $depth"
+            fi
+        else
+            if ps -p "$current_pid" -o comm= 2>/dev/null | grep -qiw "roo" || \
+               ps -p "$current_pid" -o cmd= 2>/dev/null | grep -qiw "roo"; then
+                detected="$detected roo"
+                _ami_debug "Detected Roo Code in process tree at depth $depth"
+            fi
+        fi
+        # Windsurf detection
+        if ami_process_contains "$current_pid" "windsurf"; then
+            detected="$detected windsurf"
+            _ami_debug "Detected Windsurf in process tree at depth $depth"
         fi
         # Droid detection - use word boundary to avoid matching android-studio, etc.
         if [[ "$OSTYPE" == "darwin"* ]]; then
             if ps -p "$current_pid" -o comm= 2>/dev/null | grep -qiw "droid" || \
                ps -p "$current_pid" -o command= 2>/dev/null | grep -qiw "droid"; then
                 detected="$detected droid"
+                _ami_debug "Detected Droid in process tree at depth $depth"
             fi
         else
             if ps -p "$current_pid" -o comm= 2>/dev/null | grep -qiw "droid" || \
                ps -p "$current_pid" -o cmd= 2>/dev/null | grep -qiw "droid"; then
                 detected="$detected droid"
+                _ami_debug "Detected Droid in process tree at depth $depth"
             fi
         fi
 
@@ -204,61 +330,188 @@ check_ps_tree() {
 }
 
 # Main AI detection function with proper two-phase approach
-detect_ai_tool() {
+# Returns the detected AI tool name, or "none" if no AI detected
+# Priority order ensures more specific tools take precedence over generic ones
+ami_detect() {
+    _ami_debug "Starting AI detection"
+
     # Phase 1: Environment variable detection
     local env_detected
-    env_detected=$(check_env_vars)
+    env_detected=$(ami_check_env)
 
     # Phase 2: Process tree detection
     local ps_detected
-    ps_detected=$(check_ps_tree)
+    ps_detected=$(ami_check_ps_tree)
 
     # Combine results and apply priority order
     local all_detected="$env_detected $ps_detected"
 
-# Priority order: Amp > Codex > Aider > Claude > Gemini > Qwen > Droid > OpenCode > Cursor > Copilot > Kimi > OpenHands > Crush > Goose > Auggie > Zed
+    _ami_debug "Environment detected: '$env_detected'"
+    _ami_debug "Process tree detected: '$ps_detected'"
+    _ami_debug "Combined detected: '$all_detected'"
+
+    # Priority order: Amp > Codex > Aider > Claude > Gemini > Qwen > Droid > OpenCode > Cursor > Copilot > Kimi > OpenHands > Cline > Roo > Windsurf > Crush > Goose > Auggie > Zed
     # Zed is last because it often hosts other AI tools
-    # Kimi takes precedence over Zed as requested
-    # OpenHands comes before Zed but after more specific AI tools
-    # Crush takes precedence over Zed but after other AI tools
-    # Goose comes after Crush but before Zed
-    # Auggie comes after Goose but before Zed
+    # More specific AI tools take precedence over IDE-level tools
     if [[ "$all_detected" =~ "amp" ]]; then
+        _ami_debug "Final result: amp"
         echo "amp"
     elif [[ "$all_detected" =~ "codex" ]]; then
+        _ami_debug "Final result: codex"
         echo "codex"
     elif [[ "$all_detected" =~ "aider" ]]; then
+        _ami_debug "Final result: aider"
         echo "aider"
     elif [[ "$all_detected" =~ "claude" ]]; then
+        _ami_debug "Final result: claude"
         echo "claude"
     elif [[ "$all_detected" =~ "gemini" ]]; then
+        _ami_debug "Final result: gemini"
         echo "gemini"
     elif [[ "$all_detected" =~ "qwen" ]]; then
+        _ami_debug "Final result: qwen"
         echo "qwen"
     elif [[ "$all_detected" =~ "droid" ]]; then
+        _ami_debug "Final result: droid"
         echo "droid"
     elif [[ "$all_detected" =~ "opencode" ]]; then
+        _ami_debug "Final result: opencode"
         echo "opencode"
     elif [[ "$all_detected" =~ "cursor" ]]; then
+        _ami_debug "Final result: cursor"
         echo "cursor"
     elif [[ "$all_detected" =~ "copilot" ]]; then
+        _ami_debug "Final result: copilot"
         echo "copilot"
     elif [[ "$all_detected" =~ "kimi" ]]; then
+        _ami_debug "Final result: kimi"
         echo "kimi"
     elif [[ "$all_detected" =~ "openhands" ]]; then
+        _ami_debug "Final result: openhands"
         echo "openhands"
+    elif [[ "$all_detected" =~ "cline" ]]; then
+        _ami_debug "Final result: cline"
+        echo "cline"
+    elif [[ "$all_detected" =~ "roo" ]]; then
+        _ami_debug "Final result: roo"
+        echo "roo"
+    elif [[ "$all_detected" =~ "windsurf" ]]; then
+        _ami_debug "Final result: windsurf"
+        echo "windsurf"
     elif [[ "$all_detected" =~ "crush" ]]; then
+        _ami_debug "Final result: crush"
         echo "crush"
     elif [[ "$all_detected" =~ "goose" ]]; then
+        _ami_debug "Final result: goose"
         echo "goose"
     elif [[ "$all_detected" =~ "auggie" ]]; then
+        _ami_debug "Final result: auggie"
         echo "auggie"
     elif [[ "$all_detected" =~ "zed" ]]; then
+        _ami_debug "Final result: zed"
         echo "zed"
     else
+        _ami_debug "Final result: none"
         echo "none"
     fi
 }
+
+# Convenience function: returns 0 (true) if AI is detected, 1 (false) otherwise
+ami_is_ai() {
+    local result
+    result=$(ami_detect)
+    [ "$result" != "none" ]
+}
+
+# Get all detected AI tools (not just the highest priority one)
+# Returns space-separated list or empty string
+ami_detect_all() {
+    local env_detected
+    env_detected=$(ami_check_env)
+
+    local ps_detected
+    ps_detected=$(ami_check_ps_tree)
+
+    # Combine and deduplicate
+    local all_detected="$env_detected $ps_detected"
+
+    # Remove leading/trailing spaces and deduplicate
+    echo "$all_detected" | tr ' ' '\n' | sort -u | tr '\n' ' ' | sed 's/^ *//;s/ *$//'
+}
+
+# Get the email address for a detected AI tool
+# Arguments: $1 = AI tool name (optional, uses ami_detect if not provided)
+ami_get_email() {
+    local tool="${1:-$(ami_detect)}"
+
+    case "$tool" in
+        "claude")   echo "noreply@anthropic.com" ;;
+        "gemini")   echo "noreply@google.com" ;;
+        "codex")    echo "noreply@openai.com" ;;
+        "aider")    echo "aider@aider.chat" ;;
+        "qwen")     echo "noreply@alibaba.com" ;;
+        "cursor")   echo "cursoragent@cursor.com" ;;
+        "opencode") echo "noreply@opencode.ai" ;;
+        "zed")      echo "noreply@zed.dev" ;;
+        "copilot")  echo "copilot@github.com" ;;
+        "droid")    echo "droid@factory.ai" ;;
+        "amp")      echo "noreply@sourcegraph.com" ;;
+        "kimi")     echo "noreply@kimi.com" ;;
+        "openhands") echo "openhands@all-hands.dev" ;;
+        "crush")    echo "crush@charm.land" ;;
+        "goose")    echo "goose@opensource.block.xyz" ;;
+        "auggie")   echo "noreply@augmentcode.com" ;;
+        "cline")    echo "cline@cline.bot" ;;
+        "roo")      echo "roo@roocode.dev" ;;
+        "windsurf") echo "cascade@codeium.com" ;;
+        *)          echo "" ;;
+    esac
+}
+
+# Get the display name for a detected AI tool
+# Arguments: $1 = AI tool name (optional, uses ami_detect if not provided)
+ami_get_name() {
+    local tool="${1:-$(ami_detect)}"
+
+    case "$tool" in
+        "claude")   echo "Claude Code" ;;
+        "gemini")   echo "Gemini" ;;
+        "codex")    echo "Codex CLI" ;;
+        "aider")    echo "Aider" ;;
+        "qwen")     echo "Qwen Code" ;;
+        "cursor")   echo "Cursor AI" ;;
+        "opencode") echo "opencode AI" ;;
+        "zed")      echo "Zed AI" ;;
+        "copilot")  echo "GitHub Copilot" ;;
+        "droid")    echo "Droid" ;;
+        "amp")      echo "Amp" ;;
+        "kimi")     echo "Kimi CLI" ;;
+        "openhands") echo "OpenHands" ;;
+        "crush")    echo "Crush" ;;
+        "goose")    echo "Goose User" ;;
+        "auggie")   echo "Augment Code" ;;
+        "cline")    echo "Cline" ;;
+        "roo")      echo "Roo Code" ;;
+        "windsurf") echo "Windsurf Cascade" ;;
+        *)          echo "" ;;
+    esac
+}
+
+# Print version information
+ami_version() {
+    echo "am-i-ai version $AMI_VERSION"
+    echo "https://github.com/trieloff/am-i-ai"
+}
+
+# If this script is run directly (not sourced), run the detection
+
+# Map am-i-ai function names to local conventions
+process_contains() { ami_process_contains "$@"; }
+check_env_vars() { ami_check_env; }
+check_ps_tree() { ami_check_ps_tree; }
+detect_ai_tool() { ami_detect; }
+
+# --- END BUNDLED am-i-ai ---
 
 # Find the real git executable
 find_real_git() {
@@ -445,210 +698,26 @@ if [ "$1" = "commit" ]; then
         fi
     fi
 
-    # Build git command with appropriate author settings
-    case "$ai_tool" in
-        "codex")
-            # Add AI attribution and sign-off
-            extra_args=(
-                -c "user.name=Codex CLI"
-                -c "user.email=noreply@openai.com"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
-            ;;
-        "aider")
-            # Add AI attribution and sign-off
-            extra_args=(
-                -c "user.name=Aider"
-                -c "user.email=aider@aider.chat"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
-            ;;
-        "gemini")
-            # Add AI attribution and sign-off
-            extra_args=(
-                -c "user.name=Gemini"
-                -c "user.email=noreply@google.com"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
-            ;;
-        "qwen")
-            # Add AI attribution and sign-off
-            extra_args=(
-                -c "user.name=Qwen Code"
-                -c "user.email=noreply@alibaba.com"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
-            ;;
-        "claude")
-            # Add AI attribution and sign-off
-            extra_args=(
-                -c "user.name=Claude Code"
-                -c "user.email=noreply@anthropic.com"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
-            ;;
-        "zed")
-            extra_args=(
-                -c "user.name=Zed AI"
-                -c "user.email=noreply@zed.dev"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
-            ;;
-        "opencode")
-            extra_args=(
-                -c "user.name=opencode AI"
-                -c "user.email=noreply@opencode.ai"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
-            ;;
-        "cursor")
-            extra_args=(
-                -c "user.name=Cursor AI"
-                -c "user.email=cursoragent@cursor.com"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
-            ;;
-        "copilot")
-            extra_args=(
-                -c "user.name=GitHub Copilot"
-                -c "user.email=copilot@github.com"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
-            ;;
-        "droid")
-            extra_args=(
-                -c "user.name=Droid"
-                -c "user.email=droid@factory.ai"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
-            ;;
-        "amp")
-            extra_args=(
-                -c "user.name=Amp"
-                -c "user.email=noreply@sourcegraph.com"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
-            ;;
-        "kimi")
-            extra_args=(
-                -c "user.name=Kimi CLI"
-                -c "user.email=noreply@kimi.com"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
-            ;;
-"openhands")
-            extra_args=(
-                -c "user.name=OpenHands"
-                -c "user.email=openhands@all-hands.dev"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
-            ;;
-        "crush")
-            extra_args=(
-                -c "user.name=Crush"
-                -c "user.email=crush@charm.land"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
-            ;;
-        "goose")
-            extra_args=(
-                -c "user.name=Goose User"
-                -c "user.email=goose@opensource.block.xyz"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
-            ;;
-        "auggie")
-            extra_args=(
-                -c "user.name=Auggie"
-                -c "user.email=auggie@augmentcode.com"
-                -c "commit.gpgsign=false"
-            )
-            if [ "$has_lazy_cheater_flag" = true ]; then
-                signoff=$(get_git_signoff "disapprove")
-            else
-                signoff=$(get_git_signoff)
-            fi
-            ;;
-        *)
-            # Regular commit - no special handling
-            exec "$GIT_BIN" "$@"
-            ;;
-    esac
+    # Build git command with appropriate author settings using am-i-ai library
+    # This automatically supports all AI tools defined in am-i-ai
+    ai_name=$(ami_get_name "$ai_tool")
+    ai_email=$(ami_get_email "$ai_tool")
+
+    if [ -n "$ai_name" ] && [ -n "$ai_email" ]; then
+        extra_args=(
+            -c "user.name=$ai_name"
+            -c "user.email=$ai_email"
+            -c "commit.gpgsign=false"
+        )
+        if [ "$has_lazy_cheater_flag" = true ]; then
+            signoff=$(get_git_signoff "disapprove")
+        else
+            signoff=$(get_git_signoff)
+        fi
+    else
+        # Unknown AI tool or no attribution info - pass through to regular git
+        exec "$GIT_BIN" "$@"
+    fi
 
     # If we detected an AI tool, we need to handle the commit specially
     shift  # Remove "commit" from arguments
