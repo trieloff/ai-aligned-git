@@ -5,27 +5,17 @@
 # See: https://github.com/trieloff/am-i-ai
 
 # --- BEGIN BUNDLED am-i-ai ---
-# Bundled from am-i-ai (https://github.com/trieloff/am-i-ai)
-# This section is automatically updated by the propagate-updates workflow
+# Bundled from am-i-ai v1.0.0
+# https://github.com/trieloff/am-i-ai
+#
+# This code is auto-generated. Do not edit manually.
+# To update, run the propagate-updates workflow in am-i-ai.
 
-#   if [ "$AI_TOOL" != "none" ]; then
-
-# Version of the am-i-ai library
-AMI_VERSION="1.0.0"
-
-# Debug mode - set AMI_DEBUG=true to enable
-AMI_DEBUG="${AMI_DEBUG:-false}"
-
-# Internal debug logging function
 _ami_debug() {
     if [ "$AMI_DEBUG" = "true" ]; then
         echo "[am-i-ai] $*" >&2
     fi
 }
-
-# Function to check if a process name contains a pattern (case-insensitive)
-# Arguments: $1 = pid, $2 = pattern
-# Returns: 0 if pattern found, 1 otherwise
 ami_process_contains() {
     local pid=$1
     local pattern=$2
@@ -41,9 +31,6 @@ ami_process_contains() {
         ps -p "$pid" -o cmd= 2>/dev/null | grep -qi "$pattern"
     fi
 }
-
-# Phase 1: Environment variable detection
-# Returns space-separated list of detected AI tools
 ami_check_env() {
     local detected=""
 
@@ -68,8 +55,8 @@ ami_check_env() {
         _ami_debug "Detected Qwen via environment variable"
     fi
 
-    # Cursor detection
-    if [ -n "$CURSOR_AI" ]; then
+    # Cursor detection - use CURSOR_AGENT to avoid false positives in Cursor IDE terminals
+    if [ -n "$CURSOR_AGENT" ]; then
         detected="$detected cursor"
         _ami_debug "Detected Cursor via environment variable"
     fi
@@ -187,9 +174,6 @@ ami_check_env() {
 
     echo "$detected"
 }
-
-# Phase 2: Process tree detection
-# Returns space-separated list of detected AI tools
 ami_check_ps_tree() {
     local detected=""
     local current_pid=$$
@@ -260,7 +244,8 @@ ami_check_ps_tree() {
             detected="$detected opencode"
             _ami_debug "Detected OpenCode in process tree at depth $depth"
         fi
-        if ami_process_contains "$current_pid" "cursor"; then
+        # Cursor detection - use cursor-agent to avoid false positives in Cursor IDE terminals
+        if ami_process_contains "$current_pid" "cursor-agent"; then
             detected="$detected cursor"
             _ami_debug "Detected Cursor in process tree at depth $depth"
         fi
@@ -328,10 +313,6 @@ ami_check_ps_tree() {
 
     echo "$detected"
 }
-
-# Main AI detection function with proper two-phase approach
-# Returns the detected AI tool name, or "none" if no AI detected
-# Priority order ensures more specific tools take precedence over generic ones
 ami_detect() {
     _ami_debug "Starting AI detection"
 
@@ -415,16 +396,11 @@ ami_detect() {
         echo "none"
     fi
 }
-
-# Convenience function: returns 0 (true) if AI is detected, 1 (false) otherwise
 ami_is_ai() {
     local result
     result=$(ami_detect)
     [ "$result" != "none" ]
 }
-
-# Get all detected AI tools (not just the highest priority one)
-# Returns space-separated list or empty string
 ami_detect_all() {
     local env_detected
     env_detected=$(ami_check_env)
@@ -438,9 +414,6 @@ ami_detect_all() {
     # Remove leading/trailing spaces and deduplicate
     echo "$all_detected" | tr ' ' '\n' | sort -u | tr '\n' ' ' | sed 's/^ *//;s/ *$//'
 }
-
-# Get the email address for a detected AI tool
-# Arguments: $1 = AI tool name (optional, uses ami_detect if not provided)
 ami_get_email() {
     local tool="${1:-$(ami_detect)}"
 
@@ -467,9 +440,6 @@ ami_get_email() {
         *)          echo "" ;;
     esac
 }
-
-# Get the display name for a detected AI tool
-# Arguments: $1 = AI tool name (optional, uses ami_detect if not provided)
 ami_get_name() {
     local tool="${1:-$(ami_detect)}"
 
@@ -497,20 +467,11 @@ ami_get_name() {
     esac
 }
 
-# Print version information
-ami_version() {
-    echo "am-i-ai version $AMI_VERSION"
-    echo "https://github.com/trieloff/am-i-ai"
-}
-
-# If this script is run directly (not sourced), run the detection
-
-# Map am-i-ai function names to local conventions
+# Function aliases for backward compatibility
 process_contains() { ami_process_contains "$@"; }
 check_env_vars() { ami_check_env; }
 check_ps_tree() { ami_check_ps_tree; }
 detect_ai_tool() { ami_detect; }
-
 # --- END BUNDLED am-i-ai ---
 
 # Find the real git executable
