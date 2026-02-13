@@ -509,27 +509,42 @@ find_real_git() {
 # Main script
 GIT_BIN=$(find_real_git)
 
-# Function to get configured git user for signoff
-get_git_signoff() {
-    local mode="${1:-signoff}"  # "signoff" or "disapprove"
+# Function to get the human trailer for commit attribution
+# Maps a vibe-level mode to the appropriate trailer key
+get_human_trailer() {
+    local mode="${1:-signoff}"  # "prompt" | "sign-off" | "signoff" | "co-author" | "disapprove"
     local git_name
     local git_email
     git_name=$("$GIT_BIN" config user.name 2>/dev/null)
     git_email=$("$GIT_BIN" config user.email 2>/dev/null)
 
-    if [ "$mode" = "disapprove" ]; then
-        if [ -n "$git_name" ] && [ -n "$git_email" ]; then
-            echo "Grudgingly-Disapproved-By: $git_name <$git_email>"
-        else
-            echo "Grudgingly-Disapproved-By: Unknown User <unknown@example.com>"
-        fi
-    else
-        if [ -n "$git_name" ] && [ -n "$git_email" ]; then
-            echo "Signed-off-by: $git_name <$git_email>"
-        else
-            echo "Signed-off-by: Unknown User <unknown@example.com>"
-        fi
+    if [ -z "$git_name" ] || [ -z "$git_email" ]; then
+        git_name="Unknown User"
+        git_email="unknown@example.com"
     fi
+
+    local trailer_key
+    case "$mode" in
+        prompt)
+            trailer_key="Prompted-by"
+            ;;
+        co-author)
+            trailer_key="Co-authored-by"
+            ;;
+        disapprove)
+            trailer_key="Grudgingly-Disapproved-By"
+            ;;
+        sign-off|signoff|*)
+            trailer_key="Signed-off-by"
+            ;;
+    esac
+
+    echo "$trailer_key: $git_name <$git_email>"
+}
+
+# Check if the repository requires vibe-level disclosure
+is_vibe_level_required() {
+    "$GIT_BIN" config --get ai-aligned.disclose-vibe-level 2>/dev/null | grep -qi 'true'
 }
 
 # Function to show files that would be added
@@ -640,12 +655,15 @@ if [ "$1" = "commit" ]; then
     if [ "$ai_tool" != "none" ]; then
         has_no_verify=false
         has_lazy_cheater_flag=false
+        vibe_level=""
 
         for arg in "$@"; do
             if [ "$arg" = "--no-verify" ] || [ "$arg" = "-n" ]; then
                 has_no_verify=true
             elif [ "$arg" = "--${ai_tool}-is-a-lazy-cheater" ]; then
                 has_lazy_cheater_flag=true
+            elif [[ "$arg" == --vibe-level=* ]]; then
+                vibe_level="${arg#--vibe-level=}"
             fi
         done
 
@@ -655,6 +673,23 @@ if [ "$1" = "commit" ]; then
             echo "" >&2
             echo "If you really need to bypass hooks, add the flag: --${ai_tool}-is-a-lazy-cheater" >&2
             echo "This will publicly shame the AI for being lazy about following proper procedures." >&2
+            exit 1
+        fi
+
+        # Enforce vibe-level disclosure if required by config
+        if is_vibe_level_required && [ -z "$vibe_level" ] && [ "$has_lazy_cheater_flag" = false ]; then
+            echo "Error: This repository requires disclosure of the AI collaboration level." >&2
+            echo "Please add --vibe-level=<level> to your commit command." >&2
+            echo "" >&2
+            echo "Available levels:" >&2
+            echo "  prompt     - You (the AI) autonomously wrote this code based on a human prompt." >&2
+            echo "               The human described what they wanted; you decided how to build it." >&2
+            echo "  co-author  - You and the human collaborated on this code together." >&2
+            echo "               Both contributed ideas and implementation decisions." >&2
+            echo "  sign-off   - The human wrote this code; you helped review, refine, or debug it." >&2
+            echo "               The human made the key decisions; you assisted." >&2
+            echo "" >&2
+            echo "Example: git commit -m \"Fix bug\" --vibe-level=co-author" >&2
             exit 1
         fi
     fi
@@ -670,10 +705,13 @@ if [ "$1" = "commit" ]; then
             -c "user.email=$ai_email"
             -c "commit.gpgsign=false"
         )
+        # Determine the trailer based on vibe-level or lazy cheater flag
         if [ "$has_lazy_cheater_flag" = true ]; then
-            signoff=$(get_git_signoff "disapprove")
+            trailer=$(get_human_trailer "disapprove")
+        elif [ -n "$vibe_level" ]; then
+            trailer=$(get_human_trailer "$vibe_level")
         else
-            signoff=$(get_git_signoff)
+            trailer=$(get_human_trailer "signoff")
         fi
     else
         # Unknown AI tool or no attribution info - pass through to regular git
@@ -683,7 +721,7 @@ if [ "$1" = "commit" ]; then
     # If we detected an AI tool, we need to handle the commit specially
     shift  # Remove "commit" from arguments
 
-    # Parse commit arguments to find -m flag
+    # Parse commit arguments, stripping custom flags git doesn't understand
     commit_args=()
     message_found=false
     skip_next=false
@@ -694,16 +732,20 @@ if [ "$1" = "commit" ]; then
             continue
         fi
 
+        # Skip --vibe-level flag - git doesn't understand it
+        if [[ "$arg" == --vibe-level=* ]]; then
+            continue
+        fi
+
         if [ "$skip_next" = true ]; then
             # This is the message content after -m
             if [ "$ai_tool" != "none" ] && [ "$has_lazy_cheater_flag" = true ]; then
                 commit_args+=("$arg
 
-?? SHAME: This commit was made by $ai_tool who was too lazy to fix the commit hooks properly.")
+🤖 SHAME: This commit was made by $ai_tool who was too lazy to fix the commit hooks properly.")
             else
                 commit_args+=("$arg")
             fi
-            commit_args+=(-m "$signoff")
             skip_next=false
             message_found=true
         elif [ "$arg" = "-m" ] || [ "$arg" = "--message" ]; then
@@ -714,20 +756,15 @@ if [ "$1" = "commit" ]; then
         fi
     done
 
-    # If no message was provided with -m, add signoff using commit template
-    if [ "$message_found" = false ]; then
-        # Create temporary file for commit message template
-        tmpfile=$(mktemp)
-        if [ "$ai_tool" != "none" ] && [ "$has_lazy_cheater_flag" = true ]; then
-            echo "
+    # Append --trailer for human attribution (works with both -m and editor modes)
+    commit_args+=(--trailer "$trailer")
 
-?? SHAME: This commit was made by $ai_tool who was too lazy to fix the commit hooks properly." >> "$tmpfile"
-        fi
-        echo "" >> "$tmpfile"
-        if [ "$has_lazy_cheater_flag" = true ]; then
-            signoff=$(get_git_signoff "disapprove")
-        fi
-        echo "$signoff" >> "$tmpfile"
+    # If no -m message was provided and lazy cheater flag is set,
+    # use a template to inject the SHAME body text for the editor
+    if [ "$message_found" = false ] && [ "$has_lazy_cheater_flag" = true ]; then
+        tmpfile=$(mktemp)
+        echo "
+🤖 SHAME: This commit was made by $ai_tool who was too lazy to fix the commit hooks properly." >> "$tmpfile"
         commit_args+=(--template "$tmpfile")
 
         # Run git commit and clean up
@@ -736,7 +773,7 @@ if [ "$1" = "commit" ]; then
         rm -f "$tmpfile"
         exit $exit_code
     else
-        # Run git commit with modified arguments
+        # Run git commit with trailer appended
         exec "$GIT_BIN" "${extra_args[@]}" commit "${commit_args[@]}"
     fi
 else
