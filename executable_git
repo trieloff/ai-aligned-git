@@ -664,6 +664,14 @@ if [ "$1" = "commit" ]; then
                 has_lazy_cheater_flag=true
             elif [[ "$arg" == --vibe-level=* ]]; then
                 vibe_level="${arg#--vibe-level=}"
+                case "$vibe_level" in
+                    prompt|co-author|sign-off|signoff) ;;
+                    *)
+                        echo "Error: Invalid --vibe-level value: '$vibe_level'." >&2
+                        echo "Allowed values are: prompt, co-author, sign-off." >&2
+                        exit 1
+                        ;;
+                esac
             fi
         done
 
