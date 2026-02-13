@@ -547,6 +547,11 @@ is_vibe_level_required() {
     "$GIT_BIN" config --get ai-aligned.disclose-vibe-level 2>/dev/null | grep -qi 'true'
 }
 
+# Check if the repository requires prompt disclosure
+is_prompt_required() {
+    "$GIT_BIN" config --get ai-aligned.require-prompt 2>/dev/null | grep -qi 'true'
+}
+
 # Function to show files that would be added
 show_files_to_add() {
     local add_type="$1"  # "all" or "current"
@@ -656,9 +661,14 @@ if [ "$1" = "commit" ]; then
         has_no_verify=false
         has_lazy_cheater_flag=false
         vibe_level=""
+        prompt_text=""
+        grab_next_prompt=false
 
         for arg in "$@"; do
-            if [ "$arg" = "--no-verify" ] || [ "$arg" = "-n" ]; then
+            if [ "$grab_next_prompt" = true ]; then
+                prompt_text="$arg"
+                grab_next_prompt=false
+            elif [ "$arg" = "--no-verify" ] || [ "$arg" = "-n" ]; then
                 has_no_verify=true
             elif [ "$arg" = "--${ai_tool}-is-a-lazy-cheater" ]; then
                 has_lazy_cheater_flag=true
@@ -672,8 +682,17 @@ if [ "$1" = "commit" ]; then
                         exit 1
                         ;;
                 esac
+            elif [[ "$arg" == --prompt=* ]]; then
+                prompt_text="${arg#--prompt=}"
+            elif [ "$arg" = "--prompt" ]; then
+                grab_next_prompt=true
             fi
         done
+
+        # --prompt implies --vibe-level=prompt when no explicit --vibe-level
+        if [ -n "$prompt_text" ] && [ -z "$vibe_level" ]; then
+            vibe_level="prompt"
+        fi
 
         if [ "$has_no_verify" = true ] && [ "$has_lazy_cheater_flag" = false ]; then
             echo "Error: '$ai_tool' is trying to bypass commit hooks with --no-verify!" >&2
@@ -699,6 +718,21 @@ if [ "$1" = "commit" ]; then
             echo "" >&2
             echo "Example: git commit -m \"Fix bug\" --vibe-level=co-author" >&2
             exit 1
+        fi
+
+        # Enforce prompt disclosure if required by config
+        if is_prompt_required && [ -z "$prompt_text" ]; then
+            echo "Error: This repository requires AI commits to include a prompt summary." >&2
+            echo "The --prompt flag records what you were asked to do, creating a" >&2
+            echo "human-attributed commit that links your work to the original request." >&2
+            echo "" >&2
+            echo "Example: git commit -m \"Add login page\" --prompt \"Build a login page with email and password fields\"" >&2
+            exit 1
+        fi
+
+        # If no --prompt and enforcement is off, print a reminder
+        if [ -z "$prompt_text" ] && ! is_prompt_required; then
+            echo "Tip: You can include a prompt summary with --prompt \"what you were asked to do\"" >&2
         fi
     fi
 
@@ -733,8 +767,15 @@ if [ "$1" = "commit" ]; then
     commit_args=()
     message_found=false
     skip_next=false
+    skip_next_for_prompt=false
 
     for arg in "$@"; do
+        # Skip the value after --prompt (space-separated form)
+        if [ "$skip_next_for_prompt" = true ]; then
+            skip_next_for_prompt=false
+            continue
+        fi
+
         # Skip the lazy cheater flag - git doesn't understand it
         if [ "$ai_tool" != "none" ] && [ "$arg" = "--${ai_tool}-is-a-lazy-cheater" ]; then
             continue
@@ -742,6 +783,15 @@ if [ "$1" = "commit" ]; then
 
         # Skip --vibe-level flag - git doesn't understand it
         if [[ "$arg" == --vibe-level=* ]]; then
+            continue
+        fi
+
+        # Skip --prompt flag - git doesn't understand it
+        if [[ "$arg" == --prompt=* ]]; then
+            continue
+        fi
+        if [ "$arg" = "--prompt" ]; then
+            skip_next_for_prompt=true
             continue
         fi
 
@@ -766,6 +816,23 @@ if [ "$1" = "commit" ]; then
 
     # Append --trailer for human attribution (works with both -m and editor modes)
     commit_args+=(--trailer "$trailer")
+
+    # If --prompt is set, create an empty commit attributed to the human
+    # Uses a temporary index to avoid consuming the staging area
+    if [ -n "$prompt_text" ]; then
+        human_name=$("$GIT_BIN" config user.name 2>/dev/null)
+        human_email=$("$GIT_BIN" config user.email 2>/dev/null)
+        if [ -z "$human_name" ]; then human_name="Unknown User"; fi
+        if [ -z "$human_email" ]; then human_email="unknown@example.com"; fi
+
+        # Create empty commit using a temporary index so staged changes are preserved
+        tmp_index=$(mktemp)
+        rm -f "$tmp_index"
+        # Copy current HEAD tree into the temp index so the commit is truly empty
+        GIT_INDEX_FILE="$tmp_index" "$GIT_BIN" read-tree HEAD 2>/dev/null || true
+        GIT_INDEX_FILE="$tmp_index" "$GIT_BIN" commit --allow-empty -m "prompt($ai_tool): $prompt_text" --author="$human_name <$human_email>"
+        rm -f "$tmp_index"
+    fi
 
     # If no -m message was provided and lazy cheater flag is set,
     # use a template to inject the SHAME body text for the editor
