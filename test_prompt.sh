@@ -35,7 +35,7 @@ setup_repo() {
 
 # Clean up a test repo and return to original directory
 cleanup_repo() {
-    cd "$SCRIPT_DIR"
+    cd "$SCRIPT_DIR" || exit 1
     rm -rf "$1"
 }
 
@@ -66,7 +66,7 @@ echo ""
 # Test 1: Basic --prompt usage creates empty commit + code commit
 # ---------------------------------------------------------------
 TMPDIR_1=$(setup_repo)
-cd "$TMPDIR_1"
+cd "$TMPDIR_1" || exit 1
 
 echo "test1" > file.txt
 CLAUDECODE=1 "$GIT_WRAPPER" add file.txt
@@ -85,7 +85,7 @@ cleanup_repo "$TMPDIR_1"
 # Test 2: Empty commit format is prompt(<agent>): <summary>
 # ---------------------------------------------------------------
 TMPDIR_2=$(setup_repo)
-cd "$TMPDIR_2"
+cd "$TMPDIR_2" || exit 1
 
 echo "test2" > file.txt
 CLAUDECODE=1 "$GIT_WRAPPER" add file.txt
@@ -105,7 +105,7 @@ cleanup_repo "$TMPDIR_2"
 # Test 3: Empty commit authorship is human name/email, not AI
 # ---------------------------------------------------------------
 TMPDIR_3=$(setup_repo)
-cd "$TMPDIR_3"
+cd "$TMPDIR_3" || exit 1
 
 echo "test3" > file.txt
 CLAUDECODE=1 "$GIT_WRAPPER" add file.txt
@@ -135,7 +135,7 @@ cleanup_repo "$TMPDIR_3"
 # Test 4: --prompt implies --vibe-level=prompt (trailer is Prompted-by:)
 # ---------------------------------------------------------------
 TMPDIR_4=$(setup_repo)
-cd "$TMPDIR_4"
+cd "$TMPDIR_4" || exit 1
 
 echo "test4" > file.txt
 CLAUDECODE=1 "$GIT_WRAPPER" add file.txt
@@ -154,7 +154,7 @@ cleanup_repo "$TMPDIR_4"
 # Test 5: --prompt with explicit --vibe-level=co-author uses co-author trailer
 # ---------------------------------------------------------------
 TMPDIR_5=$(setup_repo)
-cd "$TMPDIR_5"
+cd "$TMPDIR_5" || exit 1
 
 echo "test5" > file.txt
 CLAUDECODE=1 "$GIT_WRAPPER" add file.txt
@@ -173,7 +173,7 @@ cleanup_repo "$TMPDIR_5"
 # Test 6: Enforcement: ai-aligned.require-prompt = true blocks commits without --prompt
 # ---------------------------------------------------------------
 TMPDIR_6=$(setup_repo)
-cd "$TMPDIR_6"
+cd "$TMPDIR_6" || exit 1
 git config ai-aligned.require-prompt true
 
 echo "test6" > file.txt
@@ -190,7 +190,7 @@ cleanup_repo "$TMPDIR_6"
 # Test 7: Enforcement error message is factual and includes example
 # ---------------------------------------------------------------
 TMPDIR_7=$(setup_repo)
-cd "$TMPDIR_7"
+cd "$TMPDIR_7" || exit 1
 git config ai-aligned.require-prompt true
 
 echo "test7" > file.txt
@@ -220,7 +220,7 @@ cleanup_repo "$TMPDIR_7"
 # Test 8: Non-AI commits pass through unaffected
 # ---------------------------------------------------------------
 TMPDIR_8=$(setup_repo)
-cd "$TMPDIR_8"
+cd "$TMPDIR_8" || exit 1
 git config ai-aligned.require-prompt true
 
 echo "test8" > file.txt
@@ -238,7 +238,7 @@ cleanup_repo "$TMPDIR_8"
 # Test 9: Multi-line prompt text
 # ---------------------------------------------------------------
 TMPDIR_9=$(setup_repo)
-cd "$TMPDIR_9"
+cd "$TMPDIR_9" || exit 1
 
 prompt_text="Line one
 Line two
@@ -261,7 +261,7 @@ cleanup_repo "$TMPDIR_9"
 # Test 10: Special characters in prompt text (quotes, backticks, etc.)
 # ---------------------------------------------------------------
 TMPDIR_10=$(setup_repo)
-cd "$TMPDIR_10"
+cd "$TMPDIR_10" || exit 1
 
 echo "test10" > file.txt
 CLAUDECODE=1 "$GIT_WRAPPER" add file.txt
@@ -280,7 +280,7 @@ cleanup_repo "$TMPDIR_10"
 # Test 11: --prompt= form (equals sign syntax)
 # ---------------------------------------------------------------
 TMPDIR_11=$(setup_repo)
-cd "$TMPDIR_11"
+cd "$TMPDIR_11" || exit 1
 
 echo "test11" > file.txt
 CLAUDECODE=1 "$GIT_WRAPPER" add file.txt
@@ -299,7 +299,7 @@ cleanup_repo "$TMPDIR_11"
 # Test 12: Reminder message shown for AI commit without --prompt (enforcement off)
 # ---------------------------------------------------------------
 TMPDIR_12=$(setup_repo)
-cd "$TMPDIR_12"
+cd "$TMPDIR_12" || exit 1
 # Ensure enforcement is off (default)
 
 echo "test12" > file.txt
@@ -319,7 +319,7 @@ cleanup_repo "$TMPDIR_12"
 # Test 13: Reminder is NOT shown when --prompt is provided
 # ---------------------------------------------------------------
 TMPDIR_13=$(setup_repo)
-cd "$TMPDIR_13"
+cd "$TMPDIR_13" || exit 1
 
 echo "test13" > file.txt
 CLAUDECODE=1 "$GIT_WRAPPER" add file.txt
@@ -338,7 +338,7 @@ cleanup_repo "$TMPDIR_13"
 # Test 14: Reminder is NOT shown for non-AI commits
 # ---------------------------------------------------------------
 TMPDIR_14=$(setup_repo)
-cd "$TMPDIR_14"
+cd "$TMPDIR_14" || exit 1
 
 echo "test14" > file.txt
 git add file.txt
@@ -357,7 +357,7 @@ cleanup_repo "$TMPDIR_14"
 # Test 15: --prompt with enforcement on succeeds
 # ---------------------------------------------------------------
 TMPDIR_15=$(setup_repo)
-cd "$TMPDIR_15"
+cd "$TMPDIR_15" || exit 1
 git config ai-aligned.require-prompt true
 
 echo "test15" > file.txt
