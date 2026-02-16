@@ -660,6 +660,7 @@ if [ "$1" = "commit" ]; then
     if [ "$ai_tool" != "none" ]; then
         has_no_verify=false
         has_lazy_cheater_flag=false
+        has_amend=false
         vibe_level=""
         prompt_text=""
         grab_next_prompt=false
@@ -670,6 +671,8 @@ if [ "$1" = "commit" ]; then
                 grab_next_prompt=false
             elif [ "$arg" = "--no-verify" ] || [ "$arg" = "-n" ]; then
                 has_no_verify=true
+            elif [ "$arg" = "--amend" ]; then
+                has_amend=true
             elif [ "$arg" = "--${ai_tool}-is-a-lazy-cheater" ]; then
                 has_lazy_cheater_flag=true
             elif [[ "$arg" == --vibe-level=* ]]; then
@@ -678,7 +681,7 @@ if [ "$1" = "commit" ]; then
                     prompt|co-author|sign-off|signoff) ;;
                     *)
                         echo "Error: Invalid --vibe-level value: '$vibe_level'." >&2
-                        echo "Allowed values are: prompt, co-author, sign-off." >&2
+                        echo "Allowed values are: prompt, co-author, sign-off, signoff." >&2
                         exit 1
                         ;;
                 esac
@@ -688,6 +691,21 @@ if [ "$1" = "commit" ]; then
                 grab_next_prompt=true
             fi
         done
+
+        # Check for dangling --prompt flag (no value provided)
+        if [ "$grab_next_prompt" = true ]; then
+            echo "Error: --prompt flag requires a value." >&2
+            echo "Usage: --prompt \"description\" or --prompt=\"description\"" >&2
+            exit 1
+        fi
+
+        # Reject --prompt with --amend as it changes semantics
+        if [ -n "$prompt_text" ] && [ "$has_amend" = true ]; then
+            echo "Error: --prompt cannot be used with --amend." >&2
+            echo "The --prompt flag creates a new commit before your code commit," >&2
+            echo "which conflicts with --amend's intent to modify the previous commit." >&2
+            exit 1
+        fi
 
         # --prompt implies --vibe-level=prompt when no explicit --vibe-level
         if [ -n "$prompt_text" ] && [ -z "$vibe_level" ]; then
@@ -826,11 +844,17 @@ if [ "$1" = "commit" ]; then
         if [ -z "$human_email" ]; then human_email="unknown@example.com"; fi
 
         # Create empty commit using a temporary index so staged changes are preserved
-        tmp_index=$(mktemp)
-        rm -f "$tmp_index"
+        tmp_index=$(mktemp -u)  # -u creates name only, no file
         # Copy current HEAD tree into the temp index so the commit is truly empty
-        GIT_INDEX_FILE="$tmp_index" "$GIT_BIN" read-tree HEAD 2>/dev/null || true
-        GIT_INDEX_FILE="$tmp_index" "$GIT_BIN" commit --allow-empty -m "prompt($ai_tool): $prompt_text" --author="$human_name <$human_email>"
+        if ! GIT_INDEX_FILE="$tmp_index" "$GIT_BIN" read-tree HEAD 2>/dev/null; then
+            echo "Error: Failed to prepare prompt commit (read-tree failed)." >&2
+            exit 1
+        fi
+        if ! GIT_INDEX_FILE="$tmp_index" "$GIT_BIN" commit --allow-empty -m "prompt($ai_tool): $prompt_text" --author="$human_name <$human_email>"; then
+            rm -f "$tmp_index"
+            echo "Error: Failed to create prompt commit. Aborting." >&2
+            exit 1
+        fi
         rm -f "$tmp_index"
     fi
 

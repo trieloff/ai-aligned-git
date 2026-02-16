@@ -371,6 +371,66 @@ fi
 cleanup_repo "$TMPDIR_15"
 
 # ---------------------------------------------------------------
+# Test 16: --prompt without value errors
+# ---------------------------------------------------------------
+TMPDIR_16=$(setup_repo)
+cd "$TMPDIR_16" || exit 1
+
+echo "test16" > file.txt
+CLAUDECODE=1 "$GIT_WRAPPER" add file.txt
+error_output=$(CLAUDECODE=1 "$GIT_WRAPPER" commit -m "Add feature" --prompt 2>&1 || true)
+
+if echo "$error_output" | grep -q "requires a value"; then
+    pass "--prompt without value produces error"
+else
+    fail "--prompt without value produces error" "Output: $error_output"
+fi
+
+cleanup_repo "$TMPDIR_16"
+
+# ---------------------------------------------------------------
+# Test 17: --prompt with --amend is rejected
+# ---------------------------------------------------------------
+TMPDIR_17=$(setup_repo)
+cd "$TMPDIR_17" || exit 1
+
+echo "test17" > file.txt
+CLAUDECODE=1 "$GIT_WRAPPER" add file.txt
+CLAUDECODE=1 "$GIT_WRAPPER" commit -m "Initial AI commit" 2>/dev/null
+
+echo "test17b" >> file.txt
+CLAUDECODE=1 "$GIT_WRAPPER" add file.txt
+error_output=$(CLAUDECODE=1 "$GIT_WRAPPER" commit --amend -m "Amended" --prompt "Fix stuff" 2>&1 || true)
+
+if echo "$error_output" | grep -q "cannot be used with --amend"; then
+    pass "--prompt with --amend is rejected"
+else
+    fail "--prompt with --amend is rejected" "Output: $error_output"
+fi
+
+cleanup_repo "$TMPDIR_17"
+
+# ---------------------------------------------------------------
+# Test 18: --prompt="" (empty string) treated as no prompt
+# ---------------------------------------------------------------
+TMPDIR_18=$(setup_repo)
+cd "$TMPDIR_18" || exit 1
+
+echo "test18" > file.txt
+CLAUDECODE=1 "$GIT_WRAPPER" add file.txt
+CLAUDECODE=1 "$GIT_WRAPPER" commit -m "Add feature" --prompt="" 2>/dev/null
+
+# With empty prompt, should only be 2 commits (initial + code), no prompt commit
+commit_count=$(git log --oneline | wc -l | tr -d ' ')
+if [ "$commit_count" -eq 2 ]; then
+    pass "--prompt=\"\" (empty string) treated as no prompt"
+else
+    fail "--prompt=\"\" (empty string) treated as no prompt" "Expected 2 commits, got $commit_count"
+fi
+
+cleanup_repo "$TMPDIR_18"
+
+# ---------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------
 echo ""
