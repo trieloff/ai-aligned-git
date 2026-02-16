@@ -39,6 +39,11 @@ check_env_vars() {
         detected="$detected zed"
     fi
 
+    # Cursor detection - use CURSOR_AGENT env var (cursor-agent process is checked separately below)
+    if [ -n "$CURSOR_AGENT" ]; then
+        detected="$detected cursor"
+    fi
+
     # Kimi CLI detection
     if [ -n "$KIMI_CLI" ]; then
         detected="$detected kimi"
@@ -89,7 +94,7 @@ check_ps_tree() {
             echo "  -> Found ZED at depth $depth" >&2
             detected="$detected zed"
         fi
-        if process_contains "$current_pid" "cursor"; then
+        if process_contains "$current_pid" "cursor-agent"; then
             echo "  -> Found CURSOR at depth $depth" >&2
             detected="$detected cursor"
         fi
