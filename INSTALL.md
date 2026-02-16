@@ -34,6 +34,7 @@ The installer will:
 ## Requirements
 
 - **Git**: The system git must be installed before installing the wrapper
+- **Git 2.32+**: Required for `--trailer` support (released June 2021, widely available)
 - **Unix-like OS**: macOS, Linux, or WSL on Windows
 - **Shell**: Bash, Zsh, or Fish shell
 - **curl or wget**: For the automated installer (or you can clone the repo)

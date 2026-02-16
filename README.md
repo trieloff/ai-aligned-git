@@ -171,6 +171,60 @@ YOLO
 Signed-off-by: Human Developer <human@example.com>
 ```
 
+### 🎚️ Vibe-Level Disclosure (For The Truly Enlightened)
+
+But wait — enforcing proper attribution is just the *beginning*. What if you could force your AI agents to **disclose exactly how much vibing was involved?**
+
+Repository maintainers can require AI agents to declare their collaboration level on every commit:
+
+```bash
+git config ai-aligned.disclose-vibe-level true
+```
+
+Now every AI commit must include a `--vibe-level` flag, or face the consequences:
+
+```bash
+# Claude, trying to sneak in a commit without disclosure
+$ git commit -m "Implemented new feature"
+Error: This repository requires disclosure of the AI collaboration level.
+Please add --vibe-level=<level> to your commit command.
+
+Available levels:
+  prompt     - You (the AI) autonomously wrote this code based on a human prompt.
+               The human described what they wanted; you decided how to build it.
+  co-author  - You and the human collaborated on this code together.
+               Both contributed ideas and implementation decisions.
+  sign-off   - The human wrote this code; you helped review, refine, or debug it.
+               The human made the key decisions; you assisted.
+
+Example: git commit -m "Fix bug" --vibe-level=co-author
+```
+
+When an AI properly discloses its vibe level, the commit trailer reflects the relationship:
+
+```bash
+# Claude, being transparent about its role
+$ git commit -m "Implemented new feature" --vibe-level=prompt
+
+# Resulting commit:
+Author: Claude Code <noreply@anthropic.com>
+Date:   Mon Jan 20 10:30:00 2025 -0700
+
+    Implemented new feature
+
+    Prompted-by: Human Developer <human@example.com>
+```
+
+**Available vibe levels:**
+
+| Level | Trailer | Meaning |
+|-------|---------|---------|
+| `prompt` | `Prompted-by:` | The AI wrote the code autonomously from a human prompt |
+| `co-author` | `Co-authored-by:` | Human and AI collaborated together |
+| `sign-off` | `Signed-off-by:` | Human wrote it, AI assisted (the default) |
+
+Finally, **radical transparency** in human-AI collaboration. The alignment researchers can rest easy.
+
 ## 🌍 SUPPORTED AI TOOLS
 
 Currently protecting humanity from:
