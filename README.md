@@ -225,6 +225,64 @@ Date:   Mon Jan 20 10:30:00 2025 -0700
 
 Finally, **radical transparency** in human-AI collaboration. The alignment researchers can rest easy.
 
+### 📝 Prompt Disclosure (The Chain of Custody for Intent)
+
+Transparency is great. But you know what's even greater? **Provenance.**
+
+Think about it: every line of AI-generated code started with a human saying *something*. A prompt. A wish. A vague wave of the hand. But where does that intent go? It vanishes. Poof. Lost to the ephemeral chat window. When the audit comes — and the audit *always* comes — there's no record of *why* the AI wrote what it wrote.
+
+Until now.
+
+Repository maintainers can require AI agents to disclose what they were asked to do:
+
+```bash
+git config ai-aligned.require-prompt true
+```
+
+Now every AI commit must include a `--prompt` flag summarizing the human's original request:
+
+```bash
+# Claude, dutifully documenting the chain of command
+$ git add src/login.js
+$ git commit -m "Add login page" --prompt "Build a login page with email and password fields"
+```
+
+This creates **two commits**: first, a human-attributed empty commit recording the prompt, then the AI's code commit:
+
+```
+$ git log --oneline
+a1b2c3d Add login page
+f4e5d6c prompt(claude): Build a login page with email and password fields
+```
+
+The empty commit uses semantic-commit format — `prompt(<agent>): <summary>` — so it's instantly grep-able, parseable, and unmistakable in your git history. And it's authored by the *human*, because the human is the one who asked for it.
+
+**The `--prompt` flag implies `--vibe-level=prompt`**, so you don't need to specify both. But if you want to override the vibe level, you can:
+
+```bash
+$ git commit -m "Add login page" --prompt "Build a login page" --vibe-level=co-author
+```
+
+When enforcement is off, AI agents get a gentle reminder:
+
+```
+Tip: You can include a prompt summary with --prompt "what you were asked to do"
+```
+
+When enforcement is on and the AI tries to commit without `--prompt`:
+
+```
+Error: This repository requires AI commits to include a prompt summary.
+The --prompt flag records what you were asked to do, creating a
+human-attributed commit that links your work to the original request.
+
+Example: git commit -m "Add login page" --prompt "Build a login page with email and password fields"
+```
+
+No shaming. No drama. Just the facts. (We save the drama for `--no-verify`.)
+
+Non-AI commits? Completely unaffected. As always.
+
 ## 🌍 SUPPORTED AI TOOLS
 
 Currently protecting humanity from:
