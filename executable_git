@@ -314,6 +314,14 @@ ami_check_ps_tree() {
     echo "$detected"
 }
 ami_detect() {
+    # Allow callers to opt out of AI detection (e.g., read-only tools)
+    # Set AMI_PASSTHROUGH=true to force "none" result
+    if [[ "${AMI_PASSTHROUGH:-}" == "true" ]]; then
+        _ami_debug "AMI_PASSTHROUGH is set, returning none"
+        echo "none"
+        return 0
+    fi
+
     _ami_debug "Starting AI detection"
 
     # Phase 1: Environment variable detection
@@ -402,6 +410,14 @@ ami_is_ai() {
     [ "$result" != "none" ]
 }
 ami_detect_all() {
+    # Allow callers to opt out of AI detection (e.g., read-only tools)
+    # Set AMI_PASSTHROUGH=true to force empty result
+    if [[ "${AMI_PASSTHROUGH:-}" == "true" ]]; then
+        _ami_debug "AMI_PASSTHROUGH is set, returning empty"
+        echo ""
+        return 0
+    fi
+
     local env_detected
     env_detected=$(ami_check_env)
 
